@@ -15,4 +15,11 @@ export class Group extends ArcolObject<ElementId, Element> {
   get type() {
     return "group" as const;
   }
+
+  public toDebugObj() {
+    return {
+      ...super.toDebugObj(),
+      type: this.type,
+    }
+  }
 }

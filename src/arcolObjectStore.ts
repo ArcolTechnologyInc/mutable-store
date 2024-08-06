@@ -36,6 +36,14 @@ export class ArcolObject<I extends string, T extends ArcolObject<I, T>> {
     this.set("parentId", parent.id);
   }
 
+  public toDebugObj() {
+    return {
+      id: this.id,
+      parentId: this.parentId,
+      parentIndex: this.parentIndex,
+    }
+  }
+
   protected set(key: string, value: any) {
     if (!this.store.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
@@ -109,6 +117,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
               this.objects.delete(key as I);
               this.notifyListeners(object, "delete");
             } else if (object) {
+              console.log(object)
               console.error("Error receiving update: object changed for the same key.");
             } else {
               const object = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
@@ -176,7 +185,6 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
       return;
     }
 
-    this.objects.set(id, obj);
     this.rootNode.set(id, node);
   }
 

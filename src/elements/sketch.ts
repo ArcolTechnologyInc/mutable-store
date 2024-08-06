@@ -32,4 +32,12 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   set color(value: `#${string}`) {
     this.set("color", value);
   }
+
+  toDebugObj() {
+    return {
+      ...super.toDebugObj(),
+      translate: this.translate,
+      color: this.color,
+    }
+  }
 }

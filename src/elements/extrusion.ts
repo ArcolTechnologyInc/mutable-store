@@ -23,4 +23,12 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
   set height(value: number) {
     this.set("height", value);
   }
+
+  public toDebugObj() {
+    return {
+      ...super.toDebugObj(),
+      type: this.type,
+      height: this.height,
+    }
+  }
 }

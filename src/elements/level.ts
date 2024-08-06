@@ -15,4 +15,11 @@ export class Level extends ArcolObject<ElementId, Element> {
   get type() {
     return "level" as const;
   }
+
+  public toDebugObj() {
+    return {
+      ...super.toDebugObj(),
+      type: this.type,
+    }
+  }
 }
