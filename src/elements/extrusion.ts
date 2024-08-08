@@ -4,10 +4,10 @@ import { ElementId, FileFormat } from "../fileFormat";
 import { Project } from "../project";
 import { Element } from "./element";
 
-export class Extrusion extends ArcolObject<ElementId, Element> {
+export class Extrusion extends ArcolObject<ElementId, FileFormat.Extrusion, Element> {
   constructor(
     project: Project,
-    protected node: LiveObject<FileFormat.Extrusion>
+    node: LiveObject<FileFormat.Extrusion>
   ) {
     super(project.getStore() as unknown as ArcolObjectStore<ElementId, any>, node);
   }
@@ -17,7 +17,7 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
   }
 
   get height(): number {
-    return this.node.get("height");
+    return this.fields.height;
   }
 
   set height(value: number) {

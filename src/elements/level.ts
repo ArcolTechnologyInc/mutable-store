@@ -4,7 +4,7 @@ import { ElementId, FileFormat } from "../fileFormat";
 import { Project } from "../project";
 import { Element } from "./element";
 
-export class Level extends ArcolObject<ElementId, Element> {
+export class Level extends ArcolObject<ElementId, FileFormat.Level, Element> {
   constructor(
     project: Project,
     protected node: LiveObject<FileFormat.Level>

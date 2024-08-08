@@ -1,26 +1,40 @@
 import { LiveMap, LiveObject, Room } from "@liveblocks/client";
 import { FileFormat } from "./fileFormat";
 
-export class ArcolObject<I extends string, T extends ArcolObject<I, T>> {
+export class ArcolObject<
+  I extends string,
+  S extends FileFormat.ObjectShared<I>,
+  T extends ArcolObject<I, any, T>
+> {
   private childrenSet = new Set<I>();
-  private cachedChildren: T[] = [];
+  private cachedChildren: T[] | null = null;
+
+  // The reason we store the fields in a separate object rather than just using the backing
+  // LiveObject as the source of truth is twofold:
+  // - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
+  // - We want to be able to store non-synced properties on objects.
+  //
+  // This is updated automatically via `ArcolObjectStore`'s listener -- do not use setters directly
+  // on this unless for non-synced fields.
+  protected fields: S;
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
-    protected node: LiveObject<FileFormat.ObjectShared<I>>,
+    protected node: LiveObject<S>,
   ) {
+    this.fields = node.toObject();
   }
 
   get id() {
-    return this.node.get("id");
+    return this.fields.id;
   }
 
   get parentId() {
-    return this.node.get("parentId");
+    return this.fields.parentId;
   }
 
   get parentIndex() {
-    return this.node.get("parentIndex");
+    return this.fields.parentIndex;
   }
 
   get parent(): T | null {
@@ -28,11 +42,20 @@ export class ArcolObject<I extends string, T extends ArcolObject<I, T>> {
   }
 
   get children(): T[] {
+    if (!this.cachedChildren) {
+      this.cachedChildren = [];
+      for (const childId of this.childrenSet) {
+        const child = this.store.getById(childId);
+        if (child) {
+          this.cachedChildren.push(child);
+        }
+      }
+      this.cachedChildren.sort((a, b) => (a.parentIndex ?? "").localeCompare(b.parentIndex ?? ""));
+    }
     return this.cachedChildren;
   }
 
   public setParent(parent: T) {
-    this.store.reparent(this, parent);
     this.set("parentId", parent.id);
   }
 
@@ -44,36 +67,34 @@ export class ArcolObject<I extends string, T extends ArcolObject<I, T>> {
     }
   }
 
-  protected set(key: string, value: any) {
+  public get(key: keyof S) {
+    return this.fields[key];
+  }
+
+  public set(key: keyof S, value: any) {
     if (!this.store.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
 
-    (this.node as LiveObject<any>).set(key, value);
+    this.node.set(key, value);
   }
 
   // To be called from `ArcolObjectStore` only.
-  public _internalAddChild(child: ArcolObject<I, T>) {
+  public _internalAddChild(child: ArcolObject<I, S, T>) {
     this.childrenSet.add(child.id);
-    this.updateCachedChildren();
+    this.cachedChildren = null;
   }
 
   // To be called from `ArcolObjectStore` only.
-  public _internalRemoveChild(child: ArcolObject<I, T>) {
+  public _internalRemoveChild(child: ArcolObject<I, S, T>) {
     this.childrenSet.delete(child.id);
-    this.updateCachedChildren();
+    this.cachedChildren = null;
   }
 
-  private updateCachedChildren() {
-    this.cachedChildren = [];
-    for (const childId of this.childrenSet) {
-      const child = this.store.getById(childId);
-      if (child) {
-        this.cachedChildren.push(child);
-      }
-    }
-    this.cachedChildren.sort((a, b) => (a.parentIndex ?? "").localeCompare(b.parentIndex ?? ""));
+  // To be called from `ArcolObjectStore` only.
+  public _internalUpdateField(key: keyof S, value: any) {
+    this.fields[key] = value;
   }
 }
 
@@ -87,7 +108,7 @@ export type ObjectListener<T> = (obj: T, changes: ObjectChange & {
   origin: "local" | "remote",
 }) => void;
 
-export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
+export class ArcolObjectStore<I extends string, T extends ArcolObject<I, any, T>> {
   private objects = new Map<I, T>;
   private listeners = new Set<ObjectListener<T>>();
   private makeChangesRefCount = 0;
@@ -97,6 +118,9 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     private rootNode: LiveMap<string, LiveObject<any>>,
     private objectFromLiveObject: (node: LiveObject<any>) => T,
   ) {
+  }
+
+  public initialize() {
     // Populate objects from the initial state.
     for (const [id, node] of this.rootNode) {
       const object = this.objectFromLiveObject(node);
@@ -107,22 +131,27 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
       }
     }
 
-    room.subscribe(rootNode, (nodesUpdates) => {
+    for (const object of this.objects.values()) {
+      object.parent?._internalAddChild(object);
+    }
+
+    this.room.subscribe(this.rootNode, (nodesUpdates) => {
       for (const nodeUpdate of nodesUpdates) {
         // Check for new objects being added or deleted.
         if (nodeUpdate.type === "LiveMap" && nodeUpdate.node === this.rootNode) {
           for (const key in nodeUpdate.updates) {
-            const object = this.objects.get(key as I);
+            const object = this.getById(key as I);
             if (object && nodeUpdate.updates[key].type === "delete") {
+              object.parent?._internalRemoveChild(object);
               this.objects.delete(key as I);
               this.notifyListeners(object, "delete");
             } else if (object) {
-              console.log(object)
               console.error("Error receiving update: object changed for the same key.");
             } else {
               const object = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
               if (key === object.id) {
                 this.objects.set(key as I, object);
+                object.parent?._internalAddChild(object);
                 this.notifyListeners(object, "create");
               } else {
                 console.error("Error receiving update: object key does not match object id.");
@@ -136,13 +165,21 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
           continue;
         }
 
-        const id = nodeUpdate.node.get("id") as I;
+       const id = nodeUpdate.node.get("id") as I;
         if (!id) {
           continue;
         }
-        const object = this.objects.get(id);
+        const object = this.getById(id);
         if (object) {
           for (const key in nodeUpdate.updates) {
+            const oldValue = object.get(key);
+            if (key === "parentId") {
+              const value = nodeUpdate.node.get(key);
+              this.getById(oldValue as I)?._internalRemoveChild(object);
+              const newParent = value ? this.getById(value as I) : null;
+              newParent?._internalAddChild(object);
+            }
+
             this.notifyListeners(object, "update", key);
           }
         } else {
@@ -150,18 +187,6 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
         }
       }
     }, { isDeep: true })
-  }
-
-  private notifyListeners(object: T, type: "create" | "delete"): void
-  private notifyListeners(object: T, type: "update", property: string): void
-  private notifyListeners(object: T, type: "create" | "delete" | "update", property?: string): void {
-    for (const listener of this.listeners) {
-      listener(object, {
-        type,
-        property,
-        origin: this.makingChanges() ? "local" : "remote",
-      } as ObjectChange & { origin: "local" | "remote" });
-    }
   }
 
   public getById(id: I): T | null {
@@ -188,16 +213,6 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     this.rootNode.set(id, node);
   }
 
-  public reparent(node: ArcolObject<I, T>, newParent: T) {
-    if (!this.makingChanges()) {
-      console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
-      return;
-    }
-
-    node.parent?._internalRemoveChild(node);
-    newParent._internalAddChild(node);
-  }
-
   public makeChanges<T>(cb: () => T): T {
     this.makeChangesRefCount++;
     if (this.makeChangesRefCount > 1) {
@@ -214,5 +229,21 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
 
   public makingChanges(): boolean {
     return this.makeChangesRefCount > 0;
+  }
+
+  public debugObjects() {
+    return this.getObjects().map((obj) => obj.toDebugObj());
+  }
+
+  private notifyListeners(object: T, type: "create" | "delete"): void
+  private notifyListeners(object: T, type: "update", property: string): void
+  private notifyListeners(object: T, type: "create" | "delete" | "update", property?: string): void {
+    for (const listener of this.listeners) {
+      listener(object, {
+        type,
+        property,
+        origin: this.makingChanges() ? "local" : "remote",
+      } as ObjectChange & { origin: "local" | "remote" });
+    }
   }
 }

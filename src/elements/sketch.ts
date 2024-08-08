@@ -5,7 +5,7 @@ import { Element } from "./element";
 import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
 import { Vec3 } from "../projectTypes";
 
-export class Sketch extends ArcolObject<ElementId, Element> {
+export class Sketch extends ArcolObject<ElementId, FileFormat.Sketch, Element> {
   constructor(
     project: Project,
     protected node: LiveObject<FileFormat.Sketch>
@@ -18,7 +18,7 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   }
 
   get translate(): Vec3 {
-    return this.node.get("translate") as Vec3;
+    return this.fields.translate;
   }
 
   set translate(value: Vec3) {
@@ -26,7 +26,7 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   }
 
   get color(): `#${string}` {
-    return this.node.get("color");
+    return this.fields.color;
   }
 
   set color(value: `#${string}`) {

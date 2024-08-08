@@ -5,6 +5,7 @@ import { LiveMap, LiveObject, createClient } from "@liveblocks/client";
 import { Project } from "./src/project";
 import { ElementId, FileFormat } from "./src/fileFormat";
 import { App } from "./src/ui/app";
+import { getGlobal } from "./src/global";
 
 async function init() {
   const client = createClient({
@@ -36,18 +37,8 @@ async function init() {
 
   const project = new Project(room, root as any);
 
-  project.subscribeElementChange(() => {
-    // Serialize the project
-  });
-
-  (window as any).client = client;
-  (window as any).room = room;
-  (window as any).root = root;
-  (window as any).api = {
-    createSketch: () => {
-      return project.createSketch();
-    }
-  };
+  getGlobal().room = room;
+  getGlobal().project = project;
 
   const reactRoot = createRoot(document.getElementById("root")!);
   reactRoot.render(<App />)

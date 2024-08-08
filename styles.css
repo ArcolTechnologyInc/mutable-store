@@ -1,0 +1,13 @@
+.elementRow {
+  padding: 0px 10px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+
+  display: flex;
+  justify-content: space-between;
+}
+
+.elementRow:hover {
+  background-color: lightBlue !important;
+}

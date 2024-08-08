@@ -7,16 +7,6 @@ import { Group } from "./elements/group";
 import { Level } from "./elements/level";
 import { Element } from "./elements/element";
 
-let globalProject: Project | null = null;
-
-export function setGlobalProject(project: Project) {
-  globalProject = project;
-}
-
-export function getGlobalProject() {
-  return globalProject;
-}
-
 export type ElementListener = ObjectListener<Element>;
 
 export class Project {
@@ -32,6 +22,7 @@ export class Project {
       liveblocksRoot.get("elements"),
       (obj) => this.makeElementFromLiveObject(obj)
     );
+    this.store.initialize();
 
     for (const obj of this.store.getObjects()) {
       if (obj.type === "level") {
@@ -42,8 +33,6 @@ export class Project {
     if (!this.root) {
       throw new Error("Document without root level.")
     }
-
-    globalProject = this;
   }
 
   public getStore() {
@@ -54,48 +43,56 @@ export class Project {
     return this.root!;
   }
 
+  public getById(id: ElementId): Element | null {
+    return this.store.getById(id);
+  }
+
   public subscribeElementChange(listener: ElementListener) {
     return this.store.subscribeObjectChange(listener);
   }
 
-  public createSketch() {
-    this.store.makeChanges(() => {
-      const id = crypto.randomUUID() as ElementId;
-      const node = new LiveObject({
-        type: "sketch",
-        id,
-        parentId: this.root!.id,
-        translate: [0, 0, 0],
-        color: "#888888",
-      } satisfies FileFormat.Sketch);
-      this.store.addObject(id, node, new Sketch(this, node));
-    });
+  public createSketch(): Sketch {
+    const id = crypto.randomUUID() as ElementId;
+    const node = new LiveObject({
+      type: "sketch",
+      id,
+      parentId: this.root!.id,
+      translate: [0, 0, 0],
+      color: "#888888",
+    } satisfies FileFormat.Sketch);
+    const sketch = new Sketch(this, node);
+    this.store.addObject(id, node, sketch);
+    return sketch;
   }
 
-  public createExtrusion(backingSketch: Sketch) {
-    this.store.makeChanges(() => {
-      const id = crypto.randomUUID() as ElementId;
-      const node = new LiveObject({
-        type: "extrusion",
-        id,
-        parentId: this.root!.id,
-        height: 0,
-        backingSketch: backingSketch.id,
-      } satisfies FileFormat.Extrusion);
-      this.store.addObject(id, node, new Extrusion(this, node));
-    });
+  public createExtrusion(backingSketch: Sketch): Extrusion {
+    const id = crypto.randomUUID() as ElementId;
+    const node = new LiveObject({
+      type: "extrusion",
+      id,
+      parentId: backingSketch.parentId,
+      height: 0,
+      backingSketch: backingSketch.id,
+    } satisfies FileFormat.Extrusion);
+    const extrusion = new Extrusion(this, node)
+    this.store.addObject(id, node, extrusion);
+
+    // It's consistent with our current app that there's a bi-directional link between the sketch
+    // and the extrusion, but this decision should be revisited.
+    backingSketch.setParent(extrusion);
+    return extrusion;
   }
 
-  public createGroup() {
-    this.store.makeChanges(() => {
-      const id = crypto.randomUUID() as ElementId;
-      const node = new LiveObject({
-        type: "group",
-        id,
-        parentId: this.root!.id,
-      } satisfies FileFormat.Group);
-      this.store.addObject(id, node, new Group(this, node));
-    });
+  public createGroup(): Group {
+    const id = crypto.randomUUID() as ElementId;
+    const node = new LiveObject({
+      type: "group",
+      id,
+      parentId: this.root!.id,
+    } satisfies FileFormat.Group);
+    const group = new Group(this, node);
+    this.store.addObject(id, node, group);
+    return group;
   }
 
   private makeElementFromLiveObject(node: LiveObject<FileFormat.Element>): Element {
