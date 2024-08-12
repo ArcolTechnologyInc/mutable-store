@@ -106,6 +106,7 @@ export function App() {
     .map((id) => project.getById(id as ElementId))
     .filter((x): x is Element => x !== null);
   const canExtrude = selected.length === 1 && selected[0]?.type === "sketch";
+  const canUngroup = selected.length === 1 && selected[0]?.type === "group";
 
   const onCreateSketch = () => {
     project.getStore().makeChanges(() => {
@@ -121,6 +122,30 @@ export function App() {
       });
     }
   }, [selected])
+
+  const onGroup = useCallback(() => {
+    project.getStore().makeChanges(() => {
+      const group = project.createGroup();
+      for (const element of selected) {
+        element.setParent(group);
+      }
+    });
+  }, [selected]);
+
+  const onUngroup = useCallback(() => {
+    const element = selected[0];
+    if (element?.type === "group") {
+      project.getStore().makeChanges(() => {
+        const parent = element.parent;
+        if (parent) {
+          for (const child of element.children) {
+            child.setParent(parent);
+          }
+        }
+        element.delete();
+      });
+    }
+  }, [selected]);
 
   if (!snapshot) {
     return null;
@@ -139,6 +164,8 @@ export function App() {
         <div>
           <button onClick={onCreateSketch}>Create Sketch</button>
           {canExtrude && <button onClick={onCreateExtrusion}>Extrude Sketch</button>}
+          <button onClick={onGroup}>Group</button>
+          {canUngroup && <button onClick={onUngroup}>Ungroup</button>}
         </div>
         <textarea value={snapshot.stringified} style={{ width: 500, height: 500 }} readOnly />
       </div>
