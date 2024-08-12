@@ -55,6 +55,10 @@ export class ArcolObject<
     return this.cachedChildren;
   }
 
+  public delete() {
+    this.store.removeObject(this.id);
+  }
+
   public setParent(parent: T) {
     this.set("parentId", parent.id);
   }
@@ -211,6 +215,15 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, any, T>
     }
 
     this.rootNode.set(id, node);
+  }
+
+  public removeObject(id: I) {
+    if (!this.makingChanges()) {
+      console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
+      return;
+    }
+
+    this.rootNode.delete(id);
   }
 
   public makeChanges<T>(cb: () => T): T {

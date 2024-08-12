@@ -65,11 +65,22 @@ function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
           // Shift-select selects text
           window.getSelection()?.removeAllRanges();
         } else {
-          setSelection({ [element.id]: true });
+          if (selection[element.id]) {
+            setSelection({});
+          } else {
+            setSelection({ [element.id]: true });
+          }
         }
       }}
     >
-      <span>{`${element.type}: ${element.id}`}</span>
+      <div>
+        <span>{`${element.type}: ${element.id}`}</span>
+        <span style={{ cursor: "pointer" }} onClick={() => {
+          getGlobal().project.getStore().makeChanges(() => {
+            getGlobal().project.getById(element.id)?.delete();
+          });
+        }}>{'  🗑️'}</span>
+      </div>
       <span>{selection[element.id] ? '✅' : ''}</span>
     </div>
   );
