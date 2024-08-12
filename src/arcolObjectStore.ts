@@ -1,4 +1,4 @@
-import { LiveMap, LiveObject, Room } from "@liveblocks/client";
+import { LiveMap, LiveObject, Room, StorageUpdate } from "@liveblocks/client";
 import { FileFormat } from "./fileFormat";
 
 export class ArcolObject<
@@ -13,9 +13,6 @@ export class ArcolObject<
   // LiveObject as the source of truth is twofold:
   // - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
   // - We want to be able to store non-synced properties on objects.
-  //
-  // This is updated automatically via `ArcolObjectStore`'s listener -- do not use setters directly
-  // on this unless for non-synced fields.
   protected fields: S;
 
   constructor(
@@ -56,7 +53,7 @@ export class ArcolObject<
   }
 
   public delete() {
-    this.store.removeObject(this.id);
+    this.store.removeObject(this as any);
   }
 
   public setParent(parent: T) {
@@ -81,10 +78,15 @@ export class ArcolObject<
       return;
     }
 
+    const oldValue = this.fields[key];
     this.node.set(key, value);
+    this.fields[key] = value;
+    this.store._internalOnFieldSet(this as any, key as string, oldValue, value);
   }
 
   // To be called from `ArcolObjectStore` only.
+  // We could make this a symbol private to this field to enforce it more strongly, but I think it's
+  // not worth the readability hit.
   public _internalAddChild(child: ArcolObject<I, S, T>) {
     this.childrenSet.add(child.id);
     this.cachedChildren = null;
@@ -140,57 +142,10 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, any, T>
     }
 
     this.room.subscribe(this.rootNode, (nodesUpdates) => {
-      for (const nodeUpdate of nodesUpdates) {
-        // Check for new objects being added or deleted.
-        if (nodeUpdate.type === "LiveMap" && nodeUpdate.node === this.rootNode) {
-          for (const key in nodeUpdate.updates) {
-            const object = this.getById(key as I);
-            if (object && nodeUpdate.updates[key].type === "delete") {
-              object.parent?._internalRemoveChild(object);
-              this.objects.delete(key as I);
-              this.notifyListeners(object, "delete");
-            } else if (object) {
-              console.error("Error receiving update: object changed for the same key.");
-            } else {
-              const object = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
-              if (key === object.id) {
-                this.objects.set(key as I, object);
-                object.parent?._internalAddChild(object);
-                this.notifyListeners(object, "create");
-              } else {
-                console.error("Error receiving update: object key does not match object id.");
-              }
-            }
-          }
-          continue;
-        }
-
-        if (nodeUpdate.type !== "LiveObject") {
-          continue;
-        }
-
-       const id = nodeUpdate.node.get("id") as I;
-        if (!id) {
-          continue;
-        }
-        const object = this.getById(id);
-        if (object) {
-          for (const key in nodeUpdate.updates) {
-            const oldValue = object.get(key);
-            if (key === "parentId") {
-              const value = nodeUpdate.node.get(key);
-              this.getById(oldValue as I)?._internalRemoveChild(object);
-              const newParent = value ? this.getById(value as I) : null;
-              newParent?._internalAddChild(object);
-            }
-
-            this.notifyListeners(object, "update", key);
-          }
-        } else {
-          console.error("Error receiving update: object not found.");
-        }
+      if (!this.makingChanges()) {
+        this.onRemoteChanges(nodesUpdates)
       }
-    }, { isDeep: true })
+    }, { isDeep: true });
   }
 
   public getById(id: I): T | null {
@@ -208,22 +163,28 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, any, T>
     }
   }
 
-  public addObject(id: I, node: LiveObject<any>, obj: T) {
+  public addObject(id: I, node: LiveObject<any>, object: T) {
     if (!this.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
 
     this.rootNode.set(id, node);
+    this.objects.set(id, object);
+    object.parent?._internalAddChild(object);
+    this.notifyListeners(object, "create");
   }
 
-  public removeObject(id: I) {
+  public removeObject(object: T) {
     if (!this.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
 
-    this.rootNode.delete(id);
+    object.parent?._internalRemoveChild(object);
+    this.objects.delete(object.id);
+    this.rootNode.delete(object.id);
+    this.notifyListeners(object, "delete");
   }
 
   public makeChanges<T>(cb: () => T): T {
@@ -246,6 +207,68 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, any, T>
 
   public debugObjects() {
     return this.getObjects().map((obj) => obj.toDebugObj());
+  }
+
+  // To be called from ArcolObject only.
+  public _internalOnFieldSet(object: T, key: string, oldValue: any, newValue: any) {
+    if (key === "parentId") {
+      this.getById(oldValue as I)?._internalRemoveChild(object);
+      this.getById(newValue as I)?._internalAddChild(object);
+    }
+    this.notifyListeners(object, "update", key);
+  }
+
+  private onRemoteChanges(nodesUpdates: StorageUpdate[]) {
+    for (const nodeUpdate of nodesUpdates) {
+      // Check for new objects being added or deleted.
+      if (nodeUpdate.type === "LiveMap" && nodeUpdate.node === this.rootNode) {
+        for (const key in nodeUpdate.updates) {
+          const object = this.getById(key as I);
+          if (object && nodeUpdate.updates[key].type === "delete") {
+            object.parent?._internalRemoveChild(object);
+            this.objects.delete(key as I);
+            this.notifyListeners(object, "delete");
+          } else if (object) {
+            console.error("Error receiving update: object changed for the same key.");
+          } else {
+            const object = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
+            if (key === object.id) {
+              this.objects.set(key as I, object);
+              object.parent?._internalAddChild(object);
+              this.notifyListeners(object, "create");
+            } else {
+              console.error("Error receiving update: object key does not match object id.");
+            }
+          }
+        }
+        continue;
+      }
+
+      if (nodeUpdate.type !== "LiveObject") {
+        continue;
+      }
+
+     const id = nodeUpdate.node.get("id") as I;
+      if (!id) {
+        continue;
+      }
+      const object = this.getById(id);
+      if (object) {
+        for (const key in nodeUpdate.updates) {
+          const oldValue = object.get(key);
+          if (key === "parentId") {
+            const value = nodeUpdate.node.get(key);
+            this.getById(oldValue as I)?._internalRemoveChild(object);
+            const newParent = value ? this.getById(value as I) : null;
+            newParent?._internalAddChild(object);
+          }
+
+          this.notifyListeners(object, "update", key);
+        }
+      } else {
+        console.error("Error receiving update: object not found.");
+      }
+    }
   }
 
   private notifyListeners(object: T, type: "create" | "delete"): void
