@@ -73,7 +73,7 @@ function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
         }
       }}
     >
-      <div>
+      <div style={{ fontFamily: "monospace" }}>
         <span>{`${element.type}: ${element.id}`}</span>
         <span style={{ cursor: "pointer" }} onClick={() => {
           getGlobal().project.getStore().makeChanges(() => {
