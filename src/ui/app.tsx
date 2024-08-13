@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
+import { useCallback, useState, useSyncExternalStore } from "react";
 import { getGlobal } from "../global";
 import stringify from "json-stringify-pretty-compact";
 import { Project } from "../project";
@@ -42,6 +42,25 @@ function computeSnapshot(project: Project): StoreSnapshot {
     stringified: stringify(project.getStore().debugObjects(), { maxLength: 80 }),
     flatElements,
   }
+}
+
+function useProject(): StoreSnapshot {
+  return useSyncExternalStore(getGlobal().project.getStore().subscribeObjectChange, () =>
+    computeSnapshot(getGlobal().project),
+  );
+}
+
+function useElement(elementId: ElementId): Element | null {
+  return useSyncExternalStore(
+    (onStoreChanged) => {
+      return getGlobal().project.subscribeElementChange((element) => {
+        if (element.id === elementId) {
+          onStoreChanged();
+        }
+      });
+    },
+    () => getGlobal().project.getById(elementId),
+  );
 }
 
 type ElementRowProps = {
@@ -149,14 +168,7 @@ function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
 
 export function App() {
   const project = getGlobal().project;
-
-  const [snapshot, setSnapshot] = useState<StoreSnapshot | null>(null);
-  useEffect(() => {
-    setSnapshot(computeSnapshot(project));
-    return project.getStore().subscribeObjectChange((change) => {
-      setSnapshot(computeSnapshot(project));
-    })
-  }, [project]);
+  const snapshot = useProject();
 
   const [selection, setSelection] = useState<Selection>({});
   const selected = Object.keys(selection)
