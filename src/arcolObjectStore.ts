@@ -203,7 +203,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     this.rootNode.set(id, node);
     this.objects.set(id, object);
     object.parent?._internalAddChild(object);
-    this.notifyListeners(object, "create");
+    this.notifyListeners(object, "local", "create");
   }
 
   public removeObject(object: T) {
@@ -219,7 +219,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     object.parent?._internalRemoveChild(object);
     this.objects.delete(object.id);
     this.rootNode.delete(object.id);
-    this.notifyListeners(object, "delete");
+    this.notifyListeners(object, "local", "delete");
   }
 
   public makeChanges<T>(cb: () => T): T {
@@ -258,7 +258,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     } else if (key === "parentIndex") {
       object.parent?._internalClearChildrenCache();
     }
-    this.notifyListeners(object, "update", key);
+    this.notifyListeners(object, "local", "update", key);
   }
 
   private onRemoteChanges(nodesUpdates: StorageUpdate[]) {
@@ -270,7 +270,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
           if (object && nodeUpdate.updates[key].type === "delete") {
             object.parent?._internalRemoveChild(object);
             this.objects.delete(key as I);
-            this.notifyListeners(object, "delete");
+            this.notifyListeners(object, "remote", "delete");
           } else if (object) {
             console.error("Error receiving update: object changed for the same key.");
           } else {
@@ -278,7 +278,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
             if (key === object.id) {
               this.objects.set(key as I, object);
               object.parent?._internalAddChild(object);
-              this.notifyListeners(object, "create");
+              this.notifyListeners(object, "remote", "create");
             } else {
               console.error("Error receiving update: object key does not match object id.");
             }
@@ -314,7 +314,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
           }
           object._internalUpdateField(key, newValue);
 
-          this.notifyListeners(object, "update", key);
+          this.notifyListeners(object, "remote", "update", key);
         }
       } else {
         console.error("Error receiving update: object not found.");
@@ -322,14 +322,14 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     }
   }
 
-  private notifyListeners(object: T, type: "create" | "delete"): void
-  private notifyListeners(object: T, type: "update", property: string): void
-  private notifyListeners(object: T, type: "create" | "delete" | "update", property?: string): void {
+  private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete"): void
+  private notifyListeners(object: T, origin: "local" | "remote", type: "update", property: string): void
+  private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete" | "update", property?: string): void {
     for (const listener of this.listeners) {
       listener(object, {
         type,
         property,
-        origin: this.makingChanges() ? "local" : "remote",
+        origin,
       } as ObjectChange & { origin: "local" | "remote" });
     }
   }
