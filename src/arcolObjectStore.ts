@@ -137,9 +137,7 @@ export class ArcolObject<
 
 type ObjectChange =
   | { type: "create" | "delete" }
-  // It would be nice to include the "before" value, but LiveBlocks's subscribe API doesn't provide
-  // it, so we would have to store a copy of each property ourselves.
-  | { type: "update", property: string }
+  | { type: "update", property: string, oldValue: any }
 
 export type ObjectListener<T> = (obj: T, changes: ObjectChange & {
   origin: "local" | "remote",
@@ -258,7 +256,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     } else if (key === "parentIndex") {
       object.parent?._internalClearChildrenCache();
     }
-    this.notifyListeners(object, "local", "update", key);
+    this.notifyListeners(object, "local", "update", key, oldValue);
   }
 
   private onRemoteChanges(nodesUpdates: StorageUpdate[]) {
@@ -314,7 +312,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
           }
           object._internalUpdateField(key, newValue);
 
-          this.notifyListeners(object, "remote", "update", key);
+          this.notifyListeners(object, "remote", "update", key, oldValue);
         }
       } else {
         console.error("Error receiving update: object not found.");
@@ -323,13 +321,14 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
   }
 
   private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete"): void
-  private notifyListeners(object: T, origin: "local" | "remote", type: "update", property: string): void
-  private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete" | "update", property?: string): void {
+  private notifyListeners(object: T, origin: "local" | "remote", type: "update", property: string, oldValue: any): void
+  private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
     for (const listener of this.listeners) {
       listener(object, {
         type,
         property,
         origin,
+        oldValue,
       } as ObjectChange & { origin: "local" | "remote" });
     }
   }
