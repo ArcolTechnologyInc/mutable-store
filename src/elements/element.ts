@@ -9,6 +9,11 @@ export type ElementLocalFields = {
   hidden: boolean;
 }
 
+// List of local fields common to all elements.
+export const elementLocalFields = {
+  hidden: true,
+} satisfies { [P in keyof ElementLocalFields]: true };
+
 export const elementLocalFieldsDefaults: ElementLocalFields = {
   hidden: false,
 }

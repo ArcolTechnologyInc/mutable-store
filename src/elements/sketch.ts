@@ -1,17 +1,19 @@
 import { LiveObject } from "@liveblocks/client";
 import { ElementId, FileFormat } from "../fileFormat";
 import { Project } from "../project";
-import { Element, elementLocalFieldsDefaults } from "./element";
+import { Element, elementLocalFields, elementLocalFieldsDefaults } from "./element";
 import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
 import { Vec3 } from "../projectTypes";
 
 export class Sketch extends ArcolObject<ElementId, Element> {
+  static LocalFields = elementLocalFields;
+
   // Should only be called from `Project`.
   constructor(
     project: Project,
     protected node: LiveObject<FileFormat.Sketch>
   ) {
-    super(project.getStore() as unknown as ArcolObjectStore<ElementId, any>, node);
+    super(project.getStore() as unknown as ArcolObjectStore<ElementId, any>, node, Sketch.LocalFields);
     Object.assign(this.fields, elementLocalFieldsDefaults);
   }
 

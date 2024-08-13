@@ -19,6 +19,7 @@ export class ArcolObject<
   constructor(
     protected store: ArcolObjectStore<I, T>,
     protected node: LiveObject<any>,
+    protected localFields: { [key: string]: true } = {},
   ) {
     this.fields = node.toObject();
   }
@@ -79,7 +80,6 @@ export class ArcolObject<
   public moveToParentAtIndex(parent: T, index: number) {
     this.set("parentId", parent.id);
     const clampedIndex = Math.min(index, parent.children.length);
-    console.log("moveToParentAtIndex", index, clampedIndex);
     this.set("parentIndex", generateKeyBetween(
       parent.children[clampedIndex - 1]?.parentIndex,
       parent.children[clampedIndex]?.parentIndex)
@@ -105,7 +105,10 @@ export class ArcolObject<
     }
 
     const oldValue = this.fields[key];
-    this.node.set(key, value);
+
+    if (!(key in this.localFields)) {
+      this.node.set(key, value);
+    }
     this.fields[key] = value;
     this.store._internalOnFieldSet(this as any, key as string, oldValue, value);
   }
