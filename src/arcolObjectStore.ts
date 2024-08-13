@@ -302,7 +302,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
           const newValue = nodeUpdate.node.get(key);
 
           if (deepEqual(oldValue, newValue)) {
-            return;
+            continue;
           }
 
           if (key === "parentId") {
@@ -312,6 +312,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
           } else if (key === "parentIndex") {
             object.parent?._internalClearChildrenCache();
           }
+          object._internalUpdateField(key, newValue);
 
           this.notifyListeners(object, "update", key);
         }
