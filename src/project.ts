@@ -6,6 +6,7 @@ import { Extrusion } from "./elements/extrusion";
 import { Group } from "./elements/group";
 import { Level } from "./elements/level";
 import { Element } from "./elements/element";
+import { generateKeyBetween } from "fractional-indexing";
 
 export type ElementListener = ObjectListener<Element>;
 
@@ -57,6 +58,7 @@ export class Project {
       type: "sketch",
       id,
       parentId: this.root!.id,
+      parentIndex: generateKeyBetween(this.root!.lastChild()?.parentIndex, null),
       translate: [0, 0, 0],
       color: "#888888",
     } satisfies FileFormat.Sketch);
@@ -71,6 +73,7 @@ export class Project {
       type: "extrusion",
       id,
       parentId: backingSketch.parentId,
+      parentIndex: generateKeyBetween(backingSketch.parent!.lastChild()?.parentIndex, null),
       height: 0,
       backingSketch: backingSketch.id,
     } satisfies FileFormat.Extrusion);
@@ -89,6 +92,7 @@ export class Project {
       type: "group",
       id,
       parentId: this.root!.id,
+      parentIndex: generateKeyBetween(this.root!.lastChild()?.parentIndex, null),
     } satisfies FileFormat.Group);
     const group = new Group(this, node);
     this.store.addObject(id, node, group);

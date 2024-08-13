@@ -9,6 +9,7 @@ type ElementRow = {
   id: ElementId,
   type: string,
   indent: number,
+  hidden: boolean;
 }
 
 type StoreSnapshot = {
@@ -28,6 +29,7 @@ function computeSnapshot(project: Project): StoreSnapshot {
       id: element.id,
       type: element.type,
       indent,
+      hidden: element.hidden,
     });
     for (const child of element.children) {
       traverse(child, indent + 1);
@@ -42,19 +44,57 @@ function computeSnapshot(project: Project): StoreSnapshot {
   }
 }
 
-type ElementTreeProps = {
-  elements: ElementRow[],
+type ElementRowProps = {
+  index: number,
+  element: ElementRow,
   selection: Selection,
   setSelection: (selection: Selection) => void,
 }
 
-function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
-  const rows = elements.map((element, i) =>
+function ElementRow({ element, index, selection, setSelection }: ElementRowProps) {
+  const onClickVisibility = (e: React.MouseEvent) => {
+    getGlobal().project.getStore().makeChanges(() => {
+      const el = getGlobal().project.getById(element.id);
+      if (el) {
+        el.hidden = !element.hidden;
+      }
+    });
+    e.stopPropagation();
+  }
+
+  const onClickDelete = (e: React.MouseEvent) => {
+    getGlobal().project.getStore().makeChanges(() => {
+      getGlobal().project.getById(element.id)?.delete();
+    });
+    e.stopPropagation();
+  }
+
+  const onClickUp = (e: React.MouseEvent) => {
+    getGlobal().project.getStore().makeChanges(() => {
+      const el = getGlobal().project.getById(element.id);
+      if (el) {
+        el.moveToParentAtIndex(el.parent!, el.indexInParent() - 1);
+      }
+    });
+    e.stopPropagation();
+  }
+
+  const onClickDown = (e: React.MouseEvent) => {
+    getGlobal().project.getStore().makeChanges(() => {
+      const el = getGlobal().project.getById(element.id);
+      if (el) {
+        el.moveToParentAtIndex(el.parent!, el.indexInParent() + 2);
+      }
+    });
+    e.stopPropagation();
+  }
+
+  return (
     <div key={element.id}
       className="elementRow"
       style={{
         marginLeft: `${element.indent * 30}px`,
-        backgroundColor: i % 2 === 0 ? "#f0f0f0" : "#ffffff",
+        backgroundColor: index % 2 === 0 ? "#f0f0f0" : "#ffffff",
       }}
       onClick={(e) => {
         if (e.shiftKey) {
@@ -73,20 +113,37 @@ function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
         }
       }}
     >
-      <div style={{ fontFamily: "monospace" }}>
+      <div style={{ fontFamily: "monospace", opacity: element.hidden ? 0.3 : 1.0 }}>
         <span>{`${element.type}: ${element.id}`}</span>
-        <span style={{ cursor: "pointer" }} onClick={() => {
-          getGlobal().project.getStore().makeChanges(() => {
-            getGlobal().project.getById(element.id)?.delete();
-          });
-        }}>{'  🗑️'}</span>
+        <span style={{ cursor: "pointer", padding: '5px' }} onClick={onClickVisibility}>
+          {element.hidden ? '🌥️' : '️🌤️'}
+        </span>
+        <span style={{ cursor: "pointer", padding: '5px' }} onClick={onClickUp}>⬆️</span>
+        <span style={{ cursor: "pointer", padding: '5px' }} onClick={onClickDown}>⬇️</span>
+        <span style={{ cursor: "pointer", padding: '5px' }} onClick={onClickDelete}>🗑️</span>
       </div>
       <span>{selection[element.id] ? '✅' : ''}</span>
     </div>
   );
+}
 
+type ElementTreeProps = {
+  elements: ElementRow[],
+  selection: Selection,
+  setSelection: (selection: Selection) => void,
+}
+
+function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
   return <div>
-    {rows}
+    {elements.map((element, i) => (
+      <ElementRow
+        key={element.id}
+        index={i}
+        element={element}
+        selection={selection}
+        setSelection={setSelection}
+      />
+    ))}
   </div>
 }
 
@@ -106,6 +163,7 @@ export function App() {
     .map((id) => project.getById(id as ElementId))
     .filter((x): x is Element => x !== null);
   const canExtrude = selected.length === 1 && selected[0]?.type === "sketch";
+  const canGroup = selected.length >= 1;
   const canUngroup = selected.length === 1 && selected[0]?.type === "group";
 
   const onCreateSketch = () => {
@@ -118,7 +176,10 @@ export function App() {
     const element = selected[0];
     if (element?.type === "sketch") {
       project.getStore().makeChanges(() => {
-        project.createExtrusion(element);
+        const parent = element.parent!;
+        const index = element.indexInParent();
+        const extrusion = project.createExtrusion(element);
+        extrusion.moveToParentAtIndex(parent, index);
       });
     }
   }, [selected])
@@ -126,6 +187,8 @@ export function App() {
   const onGroup = useCallback(() => {
     project.getStore().makeChanges(() => {
       const group = project.createGroup();
+      // TODO: Should determine the parent of the group via least common ancestor.
+      group.setParent(selected[0].parent!);
       for (const element of selected) {
         element.setParent(group);
       }
@@ -164,7 +227,7 @@ export function App() {
         <div>
           <button onClick={onCreateSketch}>Create Sketch</button>
           {canExtrude && <button onClick={onCreateExtrusion}>Extrude Sketch</button>}
-          <button onClick={onGroup}>Group</button>
+          {canGroup && <button onClick={onGroup}>Group</button>}
           {canUngroup && <button onClick={onUngroup}>Ungroup</button>}
         </div>
         <textarea value={snapshot.stringified} style={{ width: 500, height: 500 }} readOnly />

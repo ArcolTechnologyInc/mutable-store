@@ -2,24 +2,27 @@ import { LiveObject } from "@liveblocks/client";
 import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { Project } from "../project";
-import { Element } from "./element";
+import { Element, elementLocalFieldsDefaults } from "./element";
 
-export class Level extends ArcolObject<ElementId, FileFormat.Level, Element> {
+export class Level extends ArcolObject<ElementId, Element> {
+  // Should only be called from `Project`.
   constructor(
     project: Project,
     protected node: LiveObject<FileFormat.Level>
   ) {
     super(project.getStore() as unknown as ArcolObjectStore<ElementId, any>, node);
+    Object.assign(this.fields, elementLocalFieldsDefaults);
   }
 
   get type() {
     return "level" as const;
   }
 
-  public toDebugObj() {
-    return {
-      ...super.toDebugObj(),
-      type: this.type,
-    }
+  get hidden(): boolean {
+    return this.fields.hidden;
+  }
+
+  set hidden(value: boolean) {
+    this.set("hidden", value);
   }
 }

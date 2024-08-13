@@ -2,14 +2,16 @@ import { LiveObject } from "@liveblocks/client";
 import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { Project } from "../project";
-import { Element } from "./element";
+import { Element, elementLocalFieldsDefaults } from "./element";
 
-export class Extrusion extends ArcolObject<ElementId, FileFormat.Extrusion, Element> {
+export class Extrusion extends ArcolObject<ElementId, Element> {
+  // Should only be called from `Project`.
   constructor(
     project: Project,
     node: LiveObject<FileFormat.Extrusion>
   ) {
     super(project.getStore() as unknown as ArcolObjectStore<ElementId, any>, node);
+    Object.assign(this.fields, elementLocalFieldsDefaults);
   }
 
   get type() {
@@ -24,11 +26,11 @@ export class Extrusion extends ArcolObject<ElementId, FileFormat.Extrusion, Elem
     this.set("height", value);
   }
 
-  public toDebugObj() {
-    return {
-      ...super.toDebugObj(),
-      type: this.type,
-      height: this.height,
-    }
+  get hidden(): boolean {
+    return this.fields.hidden;
+  }
+
+  set hidden(value: boolean) {
+    this.set("hidden", value);
   }
 }

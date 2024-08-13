@@ -19,8 +19,7 @@ export namespace FileFormat {
   export type ObjectShared<I> = {
     id: I;
     parentId: I | null;
-    // Absence of parentIndex means the children of the parent are unsorted.
-    parentIndex?: string;
+    parentIndex: string;
   }
 
   export type ElementShared = ObjectShared<ElementId>;

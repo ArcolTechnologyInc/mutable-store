@@ -6,6 +6,7 @@ import { Project } from "./src/project";
 import { ElementId, FileFormat } from "./src/fileFormat";
 import { App } from "./src/ui/app";
 import { getGlobal } from "./src/global";
+import { generateKeyBetween } from "fractional-indexing";
 
 async function init() {
   const client = createClient({
@@ -27,6 +28,7 @@ async function init() {
           type: "level",
           id: levelId,
           parentId: null,
+          parentIndex: generateKeyBetween(null, null),
         } satisfies FileFormat.Level)],
       ]),
     }
