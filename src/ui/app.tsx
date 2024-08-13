@@ -83,7 +83,7 @@ function ElementRow({ element, index, selection, setSelection }: ElementRowProps
     getGlobal().project.getStore().makeChanges(() => {
       const el = getGlobal().project.getById(element.id);
       if (el) {
-        el.moveToParentAtIndex(el.parent!, el.indexInParent() + 2);
+        el.moveToParentAtIndex(el.parent!, el.indexInParent() + 1);
       }
     });
     e.stopPropagation();

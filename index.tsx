@@ -10,7 +10,8 @@ import { generateKeyBetween } from "fractional-indexing";
 
 async function init() {
   const client = createClient({
-    publicApiKey: "pk_prod_otxknoBvauIbYjjn2d31efI7gOCT4cRbe6faTEc300WDeilp-cjkOQ7CSitfjshn"
+    // Rudi's personal account key, whatever if it gets leaked.
+    publicApiKey: "pk_dev_bz-E8idsnxtmBvO1Ag2vEJMfyCONfM1jcD7p7QfLtaXUHUaG3eUE-R13-8slYn3t"
   });
   const urlParams = new URLSearchParams(window.location.search);
   const roomName = urlParams.get("room") ?? crypto.randomUUID();

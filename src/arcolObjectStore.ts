@@ -3,22 +3,44 @@ import { FileFormat } from "./fileFormat";
 import { generateKeyBetween } from "fractional-indexing";
 import { deepEqual } from "./lib/deepEqual";
 
+/**
+ * Objects that are stored in `ArcolObjectStore` are expected to extend this class. These objects
+ * wrap a `LiveObject` and provide a more convenient API for accessing and modifying the object's
+ * fields, in addition to allowing for local (non-synced) fields, cached values and derived values.
+ *
+ * <I, T> are the same as the same as the generic parameters for `ArcolObjectStore`.
+ */
 export class ArcolObject<
   I extends string,
   T extends ArcolObject<I, T>
 > {
+  /**
+   * Unsorted list of children of this object. Updated by ArcolObjectStore.
+   */
   private childrenSet = new Set<I>();
+
+  /**
+   * Most of the time, when the API consumer wants to access the children of an object, they want
+   * the sorted list, which is determined by the fractional parentIndex of the children.
+   */
   private cachedChildren: T[] | null = null;
 
-  // The reason we store the fields in a separate object rather than just using the backing
-  // LiveObject as the source of truth is twofold:
-  // - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
-  // - We want to be able to store non-synced properties on objects.
+  /**
+   * Stores the values of the fields of the object.
+   *
+   * The reason we store the fields in a separate object rather than just using the backing
+   * LiveObject as the source of truth is twofold:
+   * - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
+   * - We want to be able to store (local) non-synced properties on objects.
+   */
   protected fields: FileFormat.ObjectShared<I> & { [key: string]: any };
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
     protected node: LiveObject<any>,
+    /**
+     * List of fields that should not be persisted.
+     */
     protected localFields: { [key: string]: true } = {},
   ) {
     this.fields = node.toObject();
@@ -76,25 +98,40 @@ export class ArcolObject<
     this.set("parentIndex", generateKeyBetween(parent.lastChild()?.parentIndex, null));
   }
 
-  // Move this object to be the nth child of the parent. index === 0 => first child.
+  /**
+   * Move this object to be the nth child of the parent. index === 0 => first child.
+   */
   public moveToParentAtIndex(parent: T, index: number) {
+    const currentIndex = this.indexInParent();
+    if (currentIndex === -1 || index === currentIndex) {
+      return;
+    }
+
     this.set("parentId", parent.id);
     const clampedIndex = Math.min(index, parent.children.length);
-    this.set("parentIndex", generateKeyBetween(
-      parent.children[clampedIndex - 1]?.parentIndex,
-      parent.children[clampedIndex]?.parentIndex)
-    );
+
+    if (index > clampedIndex) {
+      this.set("parentIndex", generateKeyBetween(
+        parent.children[clampedIndex]?.parentIndex,
+        parent.children[clampedIndex + 1]?.parentIndex)
+      );
+    } else {
+      this.set("parentIndex", generateKeyBetween(
+        parent.children[clampedIndex - 1]?.parentIndex,
+        parent.children[clampedIndex]?.parentIndex)
+      );
+    }
   }
 
   public indexInParent(): number {
-    return this.parent?.children.indexOf(this as any) ?? -1;
+    return this.parent?.children.indexOf(this as unknown as T) ?? -1;
   }
 
   public toDebugObj() {
     return { ...this.fields };
   }
 
-  public get(key: string) {
+  public get(key: string): any {
     return this.fields[key];
   }
 
@@ -113,26 +150,34 @@ export class ArcolObject<
     this.store._internalOnFieldSet(this as any, key as string, oldValue, value);
   }
 
-  // To be called from `ArcolObjectStore` only.
-  // We could make this a symbol private to this field to enforce it more strongly, but I think it's
-  // not worth the readability hit.
+  /**
+   * To be called from `ArcolObjectStore` only.
+   * We could make this a symbol private to this field to enforce it more strongly, but I think it's
+   * not worth the readability hit.
+   */
   public _internalAddChild(child: ArcolObject<I, T>) {
     this.childrenSet.add(child.id);
     this.cachedChildren = null;
   }
 
-  // To be called from `ArcolObjectStore` only.
+  /**
+   * To be called from `ArcolObjectStore` only.
+   */
   public _internalRemoveChild(child: ArcolObject<I, T>) {
     this.childrenSet.delete(child.id);
     this.cachedChildren = null;
   }
 
-  // To be called from `ArcolObjectStore` only.
+  /**
+   * To be called from `ArcolObjectStore` only.
+   */
   public _internalClearChildrenCache() {
     this.cachedChildren = null;
   }
 
-  // To be called from `ArcolObjectStore` only.
+  /**
+   * To be called from `ArcolObjectStore` only.
+   */
   public _internalUpdateField(key: string, value: any) {
     this.fields[key] = value;
   }
@@ -146,6 +191,16 @@ export type ObjectListener<T> = (obj: T, changes: ObjectChange & {
   origin: "local" | "remote",
 }) => void;
 
+/**
+ * We have a general `ArcolObjectStore` class that can be instantiated because in Arcol, we have at
+ * least two types of objects: Elements and board layers.
+ *
+ * <I> is the type of the object's ID. It's probably a string, but this allows us to use branded
+ * string types.
+ *
+ * <T> is the type of the objects that we are putting in the store, probably a discriminated union
+ * of all the different subtypes of objects.
+ */
 export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
   private objects = new Map<I, T>;
   private listeners = new Set<ObjectListener<T>>();
@@ -153,7 +208,14 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
 
   constructor(
     private room: Room,
+    /**
+     * The container node for all the objects.
+     */
     private rootNode: LiveMap<string, LiveObject<any>>,
+    /**
+     * A function that creates an object from a LiveObject. This is called when receiving new
+     * remote LiveObjects or when initially populating the store.
+     */
     private objectFromLiveObject: (node: LiveObject<any>) => T,
   ) {
   }
@@ -223,6 +285,10 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     this.notifyListeners(object, "local", "delete");
   }
 
+  /**
+   * Any local mutation to objects in the store must be wrapped in a `makeChanges()` call. This
+   * ensures batching, but also allows us to distinguish between local and remote changes..
+   */
   public makeChanges<T>(cb: () => T): T {
     this.makeChangesRefCount++;
     if (this.makeChangesRefCount > 1) {
@@ -292,7 +358,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
         continue;
       }
 
-     const id = nodeUpdate.node.get("id") as I;
+      const id = nodeUpdate.node.get("id") as I;
       if (!id) {
         continue;
       }
