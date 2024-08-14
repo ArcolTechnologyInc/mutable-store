@@ -48,6 +48,26 @@ type ElementRowProps = {
 function ElementRow({ element, index }: ElementRowProps) {
   const selection = useAppState((state) => state.selection);
 
+  const onClickRow = (e: React.MouseEvent) => {
+    if (e.shiftKey) {
+      useAppState.setState({
+        selection: {
+          ...selection,
+          [element.id]: selection[element.id] ? false : true,
+        },
+      });
+      // Shift-select selects text
+      window.getSelection()?.removeAllRanges();
+    } else {
+      if (selection[element.id]) {
+        useAppState.setState({ selection: {} });
+      } else {
+        useAppState.setState({ selection: { [element.id]: true } });
+      }
+    }
+    getAppState().undoTracker.commit();
+  }
+
   const onClickVisibility = (e: React.MouseEvent) => {
     getAppState().project.makeChanges(() => {
       const el = getAppState().project.getById(element.id);
@@ -96,24 +116,7 @@ function ElementRow({ element, index }: ElementRowProps) {
         marginLeft: `${element.indent * 30}px`,
         backgroundColor: index % 2 === 0 ? "#f0f0f0" : "#ffffff",
       }}
-      onClick={(e) => {
-        if (e.shiftKey) {
-          useAppState.setState({
-            selection: {
-              ...selection,
-              [element.id]: selection[element.id] ? false : true,
-            },
-          });
-          // Shift-select selects text
-          window.getSelection()?.removeAllRanges();
-        } else {
-          if (selection[element.id]) {
-            useAppState.setState({ selection: {} });
-          } else {
-            useAppState.setState({ selection: { [element.id]: true } });
-          }
-        }
-      }}
+      onClick={onClickRow}
     >
       <div style={{ fontFamily: "monospace", opacity: element.hidden ? 0.3 : 1.0 }}>
         <span>{`${element.type}: ${element.id}`}</span>

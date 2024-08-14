@@ -4,7 +4,7 @@ import { UndoHistory } from "./undoRedo";
 import { create } from "zustand";
 import { ElementId } from "./fileFormat";
 
-type Selection = {
+export type ElementSelection = {
   [id: ElementId]: boolean,
 }
 
@@ -12,7 +12,7 @@ type AppState = {
   room: Room;
   project: ProjectStore;
   undoTracker: UndoHistory;
-  selection: Selection;
+  selection: ElementSelection;
 }
 
 export const useAppState = create<AppState>(() => ({
