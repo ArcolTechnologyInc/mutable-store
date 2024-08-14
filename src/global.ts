@@ -1,9 +1,11 @@
 import { Room } from "@liveblocks/client";
-import { Project } from "./project";
+import { ProjectStore } from "./project";
+import { UndoHistory } from "./undoRedo";
 
 const global = {} as {
   room: Room;
-  project: Project;
+  project: ProjectStore;
+  undoTracker: UndoHistory;
 }
 
 export function getGlobal() {

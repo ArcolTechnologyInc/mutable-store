@@ -3,6 +3,8 @@ import { FileFormat } from "./fileFormat";
 import { generateKeyBetween } from "fractional-indexing";
 import { deepEqual } from "./lib/deepEqual";
 
+export type ArcolObjectFields<I extends string> = FileFormat.ObjectShared<I> & { [key: string]: any };
+
 /**
  * Objects that are stored in `ArcolObjectStore` are expected to extend this class. These objects
  * wrap a `LiveObject` and provide a more convenient API for accessing and modifying the object's
@@ -33,7 +35,7 @@ export class ArcolObject<
    * - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
    * - We want to be able to store (local) non-synced properties on objects.
    */
-  protected fields: FileFormat.ObjectShared<I> & { [key: string]: any };
+  protected fields: ArcolObjectFields<I>;
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
@@ -83,6 +85,10 @@ export class ArcolObject<
       });
     }
     return this.cachedChildren;
+  }
+
+  public getFields() {
+    return this.fields;
   }
 
   public delete() {
@@ -181,15 +187,21 @@ export class ArcolObject<
   public _internalUpdateField(key: string, value: any) {
     this.fields[key] = value;
   }
+
+  /**
+   * To be called from `ArcolObjectStore` only.
+   */
+  public _internalGetNode() {
+    return this.node;
+  }
 }
 
-type ObjectChange =
+export type ChangeOrigin = "local" | "remote"
+export type ObjectChange =
   | { type: "create" | "delete" }
   | { type: "update", property: string, oldValue: any }
 
-export type ObjectListener<T> = (obj: T, changes: ObjectChange & {
-  origin: "local" | "remote",
-}) => void;
+export type ObjectListener<T> = (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
 
 /**
  * We have a general `ArcolObjectStore` class that can be instantiated because in Arcol, we have at
@@ -201,9 +213,9 @@ export type ObjectListener<T> = (obj: T, changes: ObjectChange & {
  * <T> is the type of the objects that we are putting in the store, probably a discriminated union
  * of all the different subtypes of objects.
  */
-export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
-  private objects = new Map<I, T>;
-  private listeners = new Set<ObjectListener<T>>();
+export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
+  protected objects = new Map<I, T>;
+  protected listeners = new Set<ObjectListener<T>>();
   private makeChangesRefCount = 0;
 
   constructor(
@@ -212,11 +224,6 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
      * The container node for all the objects.
      */
     private rootNode: LiveMap<string, LiveObject<any>>,
-    /**
-     * A function that creates an object from a LiveObject. This is called when receiving new
-     * remote LiveObjects or when initially populating the store.
-     */
-    private objectFromLiveObject: (node: LiveObject<any>) => T,
   ) {
   }
 
@@ -257,14 +264,14 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     }
   }
 
-  public addObject(id: I, node: LiveObject<any>, object: T) {
+  public addObject(object: T) {
     if (!this.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
 
-    this.rootNode.set(id, node);
-    this.objects.set(id, object);
+    this.rootNode.set(object.id, object._internalGetNode());
+    this.objects.set(object.id, object);
     object.parent?._internalAddChild(object);
     this.notifyListeners(object, "local", "create");
   }
@@ -287,7 +294,7 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
 
   /**
    * Any local mutation to objects in the store must be wrapped in a `makeChanges()` call. This
-   * ensures batching, but also allows us to distinguish between local and remote changes..
+   * ensures batching, but also allows us to distinguish between local and remote changes.
    */
   public makeChanges<T>(cb: () => T): T {
     this.makeChangesRefCount++;
@@ -309,6 +316,25 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
 
   public debugObjects() {
     return this.getObjects().map((obj) => obj.toDebugObj());
+  }
+
+  /**
+   * A function that creates an object from a LiveObject. This is called when receiving new
+   * remote LiveObjects or when initially populating the store.
+   */
+  public abstract objectFromLiveObject(node: LiveObject<any>): T;
+
+  public objectFromFields(fields: ArcolObjectFields<I>): T {
+    // We don't copy all the fields into the LiveObject because some of the fields are internal.
+    // That's why we iterate over fields and set them individually instead.
+    const node = new LiveObject(fields);
+    node.set("id", fields.id);
+    node.set("type", fields.type);
+    const object = this.objectFromLiveObject(node);
+    for (const field in fields) {
+      object.set(field, fields[field]);
+    }
+    return object;
   }
 
   // To be called from ArcolObject only.
@@ -389,16 +415,15 @@ export class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
     }
   }
 
-  private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete"): void
-  private notifyListeners(object: T, origin: "local" | "remote", type: "update", property: string, oldValue: any): void
-  private notifyListeners(object: T, origin: "local" | "remote", type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
+  private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete"): void
+  private notifyListeners(object: T, origin: ChangeOrigin, type: "update", property: string, oldValue: any): void
+  private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
     for (const listener of this.listeners) {
-      listener(object, {
+      listener(object, origin, {
         type,
         property,
-        origin,
         oldValue,
-      } as ObjectChange & { origin: "local" | "remote" });
+      } as ObjectChange);
     }
   }
 }

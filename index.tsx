@@ -2,11 +2,12 @@ import * as React from "react";
 import { createRoot } from "react-dom/client";
 
 import { LiveMap, LiveObject, createClient } from "@liveblocks/client";
-import { Project } from "./src/project";
+import { ProjectStore } from "./src/project";
 import { ElementId, FileFormat } from "./src/fileFormat";
 import { App } from "./src/ui/app";
 import { getGlobal } from "./src/global";
 import { generateKeyBetween } from "fractional-indexing";
+import { UndoHistory } from "./src/undoRedo";
 
 async function init() {
   const client = createClient({
@@ -38,10 +39,11 @@ async function init() {
 
   console.log(`Entered.`);
 
-  const project = new Project(room, root as any);
+  const project = new ProjectStore(room, root as any);
 
   getGlobal().room = room;
   getGlobal().project = project;
+  getGlobal().undoTracker = new UndoHistory(project);
 
   const reactRoot = createRoot(document.getElementById("root")!);
   reactRoot.render(<App />)

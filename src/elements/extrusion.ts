@@ -1,7 +1,7 @@
 import { LiveObject } from "@liveblocks/client";
 import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
-import { Project } from "../project";
+import { ProjectStore } from "../project";
 import { Element, elementLocalFields, elementLocalFieldsDefaults } from "./element";
 
 export class Extrusion extends ArcolObject<ElementId, Element> {
@@ -9,11 +9,11 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
 
   // Should only be called from `Project`.
   constructor(
-    project: Project,
+    project: ProjectStore,
     node: LiveObject<FileFormat.Extrusion>
   ) {
-    super(project.getStore() as unknown as ArcolObjectStore<ElementId, any>, node, Extrusion.LocalFields);
-    Object.assign(this.fields, elementLocalFieldsDefaults);
+    super(project, node, Extrusion.LocalFields);
+    Object.assign(this.fields, { type: "extrusion" }, elementLocalFieldsDefaults);
   }
 
   get type() {

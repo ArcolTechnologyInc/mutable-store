@@ -29,6 +29,7 @@ export namespace FileFormat {
    */
   export type ObjectShared<I> = {
     id: I;
+    type: string;
     parentId: I | null;
     parentIndex: string;
   }

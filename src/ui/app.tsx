@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
 import { getGlobal } from "../global";
 import stringify from "json-stringify-pretty-compact";
-import { Project } from "../project";
+import { ProjectStore } from "../project";
 import { Element } from "../elements/element";
 import { ElementId } from "../fileFormat";
 
@@ -21,7 +21,7 @@ type Selection = {
   [id: ElementId]: boolean,
 }
 
-function computeSnapshot(project: Project): StoreSnapshot {
+function computeSnapshot(project: ProjectStore): StoreSnapshot {
   const flatElements: ElementRow[] = [];
 
   const traverse = (element: Element, indent: number) => {
@@ -39,7 +39,7 @@ function computeSnapshot(project: Project): StoreSnapshot {
   traverse(project.getRootLevel(), 0);
 
   return {
-    stringified: stringify(project.getStore().debugObjects(), { maxLength: 80 }),
+    stringified: stringify(project.debugObjects(), { maxLength: 80 }),
     flatElements,
   }
 }
@@ -53,39 +53,43 @@ type ElementRowProps = {
 
 function ElementRow({ element, index, selection, setSelection }: ElementRowProps) {
   const onClickVisibility = (e: React.MouseEvent) => {
-    getGlobal().project.getStore().makeChanges(() => {
+    getGlobal().project.makeChanges(() => {
       const el = getGlobal().project.getById(element.id);
       if (el) {
         el.hidden = !element.hidden;
       }
     });
+    getGlobal().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickDelete = (e: React.MouseEvent) => {
-    getGlobal().project.getStore().makeChanges(() => {
+    getGlobal().project.makeChanges(() => {
       getGlobal().project.getById(element.id)?.delete();
     });
+    getGlobal().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickUp = (e: React.MouseEvent) => {
-    getGlobal().project.getStore().makeChanges(() => {
+    getGlobal().project.makeChanges(() => {
       const el = getGlobal().project.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() - 1);
       }
     });
+    getGlobal().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickDown = (e: React.MouseEvent) => {
-    getGlobal().project.getStore().makeChanges(() => {
+    getGlobal().project.makeChanges(() => {
       const el = getGlobal().project.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() + 1);
       }
     });
+    getGlobal().undoTracker.commit();
     e.stopPropagation();
   }
 
@@ -149,11 +153,25 @@ function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
 
 export function App() {
   const project = getGlobal().project;
+  const undoTracker = getGlobal().undoTracker;
+
+  useEffect(() => {
+    document.addEventListener("keydown", (e) => {
+      if (e.metaKey && e.key === "z") {
+        if (e.shiftKey) {
+          undoTracker.redo();
+        } else {
+          undoTracker.undo();
+        }
+        e.preventDefault();
+      }
+    })
+  }, []);
 
   const [snapshot, setSnapshot] = useState<StoreSnapshot | null>(null);
   useEffect(() => {
     setSnapshot(computeSnapshot(project));
-    return project.getStore().subscribeObjectChange((change) => {
+    return project.subscribeObjectChange((change) => {
       setSnapshot(computeSnapshot(project));
     })
   }, [project]);
@@ -167,25 +185,27 @@ export function App() {
   const canUngroup = selected.length === 1 && selected[0]?.type === "group";
 
   const onCreateSketch = () => {
-    project.getStore().makeChanges(() => {
+    project.makeChanges(() => {
       getGlobal().project.createSketch();
     });
+    undoTracker.commit();
   };
 
   const onCreateExtrusion = useCallback(() => {
     const element = selected[0];
     if (element?.type === "sketch") {
-      project.getStore().makeChanges(() => {
+      project.makeChanges(() => {
         const parent = element.parent!;
         const index = element.indexInParent();
         const extrusion = project.createExtrusion(element);
         extrusion.moveToParentAtIndex(parent, index);
       });
+      undoTracker.commit();
     }
   }, [selected])
 
   const onGroup = useCallback(() => {
-    project.getStore().makeChanges(() => {
+    project.makeChanges(() => {
       const group = project.createGroup();
       // TODO: Should determine the parent of the group via least common ancestor.
       group.setParent(selected[0].parent!);
@@ -193,12 +213,13 @@ export function App() {
         element.setParent(group);
       }
     });
+    undoTracker.commit();
   }, [selected]);
 
   const onUngroup = useCallback(() => {
     const element = selected[0];
     if (element?.type === "group") {
-      project.getStore().makeChanges(() => {
+      project.makeChanges(() => {
         const parent = element.parent;
         if (parent) {
           for (const child of element.children) {
@@ -207,6 +228,7 @@ export function App() {
         }
         element.delete();
       });
+      undoTracker.commit();
     }
   }, [selected]);
 
