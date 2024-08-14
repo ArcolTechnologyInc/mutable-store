@@ -5,9 +5,9 @@ import { LiveMap, LiveObject, createClient } from "@liveblocks/client";
 import { ProjectStore } from "./src/project";
 import { ElementId, FileFormat } from "./src/fileFormat";
 import { App } from "./src/ui/app";
-import { getGlobal } from "./src/global";
 import { generateKeyBetween } from "fractional-indexing";
 import { UndoHistory } from "./src/undoRedo";
+import { useAppState } from "./src/global";
 
 async function init() {
   const client = createClient({
@@ -40,10 +40,9 @@ async function init() {
   console.log(`Entered.`);
 
   const project = new ProjectStore(room, root as any);
+  const undoTracker = new UndoHistory(project);
 
-  getGlobal().room = room;
-  getGlobal().project = project;
-  getGlobal().undoTracker = new UndoHistory(project);
+  useAppState.setState({ room, project, undoTracker });
 
   const reactRoot = createRoot(document.getElementById("root")!);
   reactRoot.render(<App />)

@@ -15,7 +15,8 @@
     "fractional-indexing": "^3.2.0",
     "json-stringify-pretty-compact": "^4.0.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "zustand": "^4.5.4"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

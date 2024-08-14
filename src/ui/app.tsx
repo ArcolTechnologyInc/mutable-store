@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
-import { getGlobal } from "../global";
 import stringify from "json-stringify-pretty-compact";
 import { ProjectStore } from "../project";
 import { Element } from "../elements/element";
 import { ElementId } from "../fileFormat";
+import { getAppState, useAppState } from "../global";
 
 type ElementRow = {
   id: ElementId,
@@ -15,10 +15,6 @@ type ElementRow = {
 type StoreSnapshot = {
   stringified: string,
   flatElements: ElementRow[],
-}
-
-type Selection = {
-  [id: ElementId]: boolean,
 }
 
 function computeSnapshot(project: ProjectStore): StoreSnapshot {
@@ -47,49 +43,49 @@ function computeSnapshot(project: ProjectStore): StoreSnapshot {
 type ElementRowProps = {
   index: number,
   element: ElementRow,
-  selection: Selection,
-  setSelection: (selection: Selection) => void,
 }
 
-function ElementRow({ element, index, selection, setSelection }: ElementRowProps) {
+function ElementRow({ element, index }: ElementRowProps) {
+  const selection = useAppState((state) => state.selection);
+
   const onClickVisibility = (e: React.MouseEvent) => {
-    getGlobal().project.makeChanges(() => {
-      const el = getGlobal().project.getById(element.id);
+    getAppState().project.makeChanges(() => {
+      const el = getAppState().project.getById(element.id);
       if (el) {
         el.hidden = !element.hidden;
       }
     });
-    getGlobal().undoTracker.commit();
+    getAppState().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickDelete = (e: React.MouseEvent) => {
-    getGlobal().project.makeChanges(() => {
-      getGlobal().project.getById(element.id)?.delete();
+    getAppState().project.makeChanges(() => {
+      getAppState().project.getById(element.id)?.delete();
     });
-    getGlobal().undoTracker.commit();
+    getAppState().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickUp = (e: React.MouseEvent) => {
-    getGlobal().project.makeChanges(() => {
-      const el = getGlobal().project.getById(element.id);
+    getAppState().project.makeChanges(() => {
+      const el = getAppState().project.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() - 1);
       }
     });
-    getGlobal().undoTracker.commit();
+    getAppState().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickDown = (e: React.MouseEvent) => {
-    getGlobal().project.makeChanges(() => {
-      const el = getGlobal().project.getById(element.id);
+    getAppState().project.makeChanges(() => {
+      const el = getAppState().project.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() + 1);
       }
     });
-    getGlobal().undoTracker.commit();
+    getAppState().undoTracker.commit();
     e.stopPropagation();
   }
 
@@ -102,17 +98,19 @@ function ElementRow({ element, index, selection, setSelection }: ElementRowProps
       }}
       onClick={(e) => {
         if (e.shiftKey) {
-          setSelection({
-            ...selection,
-            [element.id]: selection[element.id] ? false : true,
+          useAppState.setState({
+            selection: {
+              ...selection,
+              [element.id]: selection[element.id] ? false : true,
+            },
           });
           // Shift-select selects text
           window.getSelection()?.removeAllRanges();
         } else {
           if (selection[element.id]) {
-            setSelection({});
+            useAppState.setState({ selection: {} });
           } else {
-            setSelection({ [element.id]: true });
+            useAppState.setState({ selection: { [element.id]: true } });
           }
         }
       }}
@@ -133,27 +131,23 @@ function ElementRow({ element, index, selection, setSelection }: ElementRowProps
 
 type ElementTreeProps = {
   elements: ElementRow[],
-  selection: Selection,
-  setSelection: (selection: Selection) => void,
 }
 
-function ElementTree({ elements, selection, setSelection }: ElementTreeProps) {
+function ElementTree({ elements }: ElementTreeProps) {
   return <div>
     {elements.map((element, i) => (
       <ElementRow
         key={element.id}
         index={i}
         element={element}
-        selection={selection}
-        setSelection={setSelection}
       />
     ))}
   </div>
 }
 
 export function App() {
-  const project = getGlobal().project;
-  const undoTracker = getGlobal().undoTracker;
+  const project = getAppState().project;
+  const undoTracker = getAppState().undoTracker;
 
   useEffect(() => {
     document.addEventListener("keydown", (e) => {
@@ -171,12 +165,12 @@ export function App() {
   const [snapshot, setSnapshot] = useState<StoreSnapshot | null>(null);
   useEffect(() => {
     setSnapshot(computeSnapshot(project));
-    return project.subscribeObjectChange((change) => {
+    return project.subscribeObjectChange(() => {
       setSnapshot(computeSnapshot(project));
     })
   }, [project]);
 
-  const [selection, setSelection] = useState<Selection>({});
+  const selection = useAppState((state) => state.selection);
   const selected = Object.keys(selection)
     .map((id) => project.getById(id as ElementId))
     .filter((x): x is Element => x !== null);
@@ -186,7 +180,7 @@ export function App() {
 
   const onCreateSketch = () => {
     project.makeChanges(() => {
-      getGlobal().project.createSketch();
+      getAppState().project.createSketch();
     });
     undoTracker.commit();
   };
@@ -239,12 +233,12 @@ export function App() {
   return (
     <div style={{ width: "1100px" }}>
       <div style={{ float: "left", width: "50%" }}>
-        <ElementTree elements={snapshot.flatElements} selection={selection} setSelection={setSelection} />
+        <ElementTree elements={snapshot.flatElements} />
       </div>
       <div style={{ float: "right", display: "flex", flexDirection: "column", gap: "10px" }}>
         <div>
-          <button onClick={() => { getGlobal().room.disconnect() } }>Pause Liveblocks</button>
-          <button onClick={() => { getGlobal().room.connect() } }>Resume Liveblocks</button>
+          <button onClick={() => { getAppState().room.disconnect() } }>Pause Liveblocks</button>
+          <button onClick={() => { getAppState().room.connect() } }>Resume Liveblocks</button>
         </div>
         <div>
           <button onClick={onCreateSketch}>Create Sketch</button>
