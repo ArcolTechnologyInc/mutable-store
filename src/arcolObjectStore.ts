@@ -116,7 +116,7 @@ export class ArcolObject<
     this.set("parentId", parent.id);
     const clampedIndex = Math.min(index, parent.children.length);
 
-    if (index > clampedIndex) {
+    if (clampedIndex > currentIndex) {
       this.set("parentIndex", generateKeyBetween(
         parent.children[clampedIndex]?.parentIndex,
         parent.children[clampedIndex + 1]?.parentIndex)
