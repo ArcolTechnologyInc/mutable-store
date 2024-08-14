@@ -306,6 +306,9 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
       return cb();
     })
 
+    // Don't let changes accumulate in LiveBlock's history -- we're managing our own undo/redo.
+    this.room.history.clear();
+
     this.makeChangesRefCount--;
     return ret;
   }
