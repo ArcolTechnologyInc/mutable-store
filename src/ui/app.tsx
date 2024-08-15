@@ -3,13 +3,14 @@ import stringify from "json-stringify-pretty-compact";
 import { ProjectStore } from "../project";
 import { Element } from "../elements/element";
 import { ElementId } from "../fileFormat";
-import { getAppState, useAppState } from "../global";
+import { getAppState, getSelectedElements, useAppState, useSelectionProperty } from "../global";
 
 type ElementRow = {
   id: ElementId,
   type: string,
   indent: number,
   hidden: boolean;
+  color: string;
 }
 
 type StoreSnapshot = {
@@ -26,6 +27,7 @@ function computeSnapshot(project: ProjectStore): StoreSnapshot {
       type: element.type,
       indent,
       hidden: element.hidden,
+      color: element.type === "sketch" ? element.color : "",
     });
     for (const child of element.children) {
       traverse(child, indent + 1);
@@ -50,12 +52,13 @@ function ElementRow({ element, index }: ElementRowProps) {
 
   const onClickRow = (e: React.MouseEvent) => {
     if (e.shiftKey) {
-      useAppState.setState({
-        selection: {
-          ...selection,
-          [element.id]: selection[element.id] ? false : true,
-        },
-      });
+      const updated = { ...selection };
+      if (selection[element.id]) {
+        delete updated[element.id];
+      } else {
+        updated[element.id] = true;
+      }
+      useAppState.setState({ selection: updated });
       // Shift-select selects text
       window.getSelection()?.removeAllRanges();
     } else {
@@ -120,6 +123,7 @@ function ElementRow({ element, index }: ElementRowProps) {
     >
       <div style={{ fontFamily: "monospace", opacity: element.hidden ? 0.3 : 1.0 }}>
         <span>{`${element.type}: ${element.id}`}</span>
+        {element.type === "sketch" ? <span style={{ color: element.color, padding: "5px" }}>◼</span> : null}
         <span style={{ cursor: "pointer", padding: '5px' }} onClick={onClickVisibility}>
           {element.hidden ? '🌥️' : '️🌤️'}
         </span>
@@ -148,9 +152,40 @@ function ElementTree({ elements }: ElementTreeProps) {
   </div>
 }
 
+function ColorInput() {
+  const [color, setColor] = useSelectionProperty<string>("color");
+  const [inputValue, setInputValue] = useState<string | null>(null);
+
+  const onSubmit = () => {
+    if (inputValue != null && /^#([A-Fa-f0-9]{6})$/.test(inputValue)) {
+      setColor(inputValue.toLowerCase());
+      setInputValue(null);
+    }
+  }
+
+  if (color == null) {
+    return;
+  }
+
+  return <div style={{ display: "flex" }}>
+    <div style={{ width: 20, height: 20, backgroundColor: color.value, border: "2px solid black" }}/>
+    <input
+      type="text"
+      value={inputValue == null ? (color.isMixed ? "Mixed" : color.value) : inputValue}
+      onChange={(e) => setInputValue(e.target.value)}
+      onBlur={onSubmit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          onSubmit();
+        }
+      }}
+    />
+  </div>
+}
+
 export function App() {
-  const project = getAppState().project;
-  const undoTracker = getAppState().undoTracker;
+  const project = useAppState(state => state.project);
+  const undoTracker = useAppState(state => state.undoTracker);
 
   useEffect(() => {
     document.addEventListener("keydown", (e) => {
@@ -174,9 +209,7 @@ export function App() {
   }, [project]);
 
   const selection = useAppState((state) => state.selection);
-  const selected = Object.keys(selection)
-    .map((id) => project.getById(id as ElementId))
-    .filter((x): x is Element => x !== null);
+  const selected = getSelectedElements(selection);
   const canExtrude = selected.length === 1 && selected[0]?.type === "sketch";
   const canGroup = selected.length >= 1;
   const canUngroup = selected.length === 1 && selected[0]?.type === "group";
@@ -234,8 +267,8 @@ export function App() {
   }
 
   return (
-    <div style={{ width: "1100px" }}>
-      <div style={{ float: "left", width: "50%" }}>
+    <div style={{ width: "1200px" }}>
+      <div style={{ float: "left", width: "55%" }}>
         <ElementTree elements={snapshot.flatElements} />
       </div>
       <div style={{ float: "right", display: "flex", flexDirection: "column", gap: "10px" }}>
@@ -245,10 +278,13 @@ export function App() {
         </div>
         <div>
           <button onClick={onCreateSketch}>Create Sketch</button>
+        </div>
+        <div>
           {canExtrude && <button onClick={onCreateExtrusion}>Extrude Sketch</button>}
           {canGroup && <button onClick={onGroup}>Group</button>}
           {canUngroup && <button onClick={onUngroup}>Ungroup</button>}
         </div>
+        <ColorInput />
         <textarea value={snapshot.stringified} style={{ width: 500, height: 500 }} readOnly />
       </div>
     </div>
