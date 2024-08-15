@@ -26,7 +26,7 @@ function computeSnapshot(project: ProjectStore): StoreSnapshot {
       id: element.id,
       type: element.type,
       indent,
-      hidden: element.hidden,
+      hidden: element.type === "level" ? false : element.hidden,
       color: element.type === "sketch" ? element.color : "",
     });
     for (const child of element.children) {

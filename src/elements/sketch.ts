@@ -1,12 +1,13 @@
 import { LiveObject } from "@liveblocks/client";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, elementLocalFields, elementLocalFieldsDefaults } from "./element";
-import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
+import { Element, HidableMixin, applyArcolObjectMixins } from "./element";
+import { ArcolObject } from "../arcolObjectStore";
 import { Vec3 } from "../projectTypes";
 
 export class Sketch extends ArcolObject<ElementId, Element> {
-  static LocalFields = elementLocalFields;
+  static LocalFields = {};
+  static LocalFieldsDefaults = {};
 
   // Should only be called from `Project`.
   constructor(
@@ -14,7 +15,7 @@ export class Sketch extends ArcolObject<ElementId, Element> {
     node: LiveObject<FileFormat.Sketch>
   ) {
     super(project, node, Sketch.LocalFields);
-    Object.assign(this.fields, { type: "sketch" }, elementLocalFieldsDefaults);
+    Object.assign(this.fields, { type: "sketch" }, Sketch.LocalFieldsDefaults);
   }
 
   get type() {
@@ -36,12 +37,8 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   set color(value: `#${string}`) {
     this.set("color", value);
   }
-
-  get hidden(): boolean {
-    return this.fields.hidden;
-  }
-
-  set hidden(value: boolean) {
-    this.set("hidden", value);
-  }
 }
+
+applyArcolObjectMixins(Sketch, [HidableMixin]);
+
+export interface Sketch extends HidableMixin {}

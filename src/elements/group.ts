@@ -1,11 +1,12 @@
 import { LiveObject } from "@liveblocks/client";
-import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
+import { ArcolObject } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, elementLocalFields, elementLocalFieldsDefaults } from "./element";
+import { Element, HidableMixin, applyArcolObjectMixins } from "./element";
 
 export class Group extends ArcolObject<ElementId, Element> {
-  static LocalFields = elementLocalFields;
+  static LocalFields = {};
+  static LocalFieldsDefaults = {};
 
   // Should only be called from `Project`.
   constructor(
@@ -13,18 +14,14 @@ export class Group extends ArcolObject<ElementId, Element> {
     node: LiveObject<FileFormat.Group>
   ) {
     super(project, node, Group.LocalFields);
-    Object.assign(this.fields, { type: "group" }, elementLocalFieldsDefaults);
+    Object.assign(this.fields, { type: "group" }, Group.LocalFieldsDefaults);
   }
 
   get type() {
     return "group" as const;
   }
-
-  get hidden(): boolean {
-    return this.fields.hidden;
-  }
-
-  set hidden(value: boolean) {
-    this.set("hidden", value);
-  }
 }
+
+applyArcolObjectMixins(Group, [HidableMixin]);
+
+export interface Group extends HidableMixin {}

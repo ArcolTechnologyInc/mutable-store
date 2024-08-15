@@ -1,11 +1,12 @@
 import { LiveObject } from "@liveblocks/client";
-import { ArcolObject, ArcolObjectStore } from "../arcolObjectStore";
+import { ArcolObject } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, elementLocalFields, elementLocalFieldsDefaults } from "./element";
+import { Element, HidableMixin, applyArcolObjectMixins } from "./element";
 
 export class Extrusion extends ArcolObject<ElementId, Element> {
-  static LocalFields = elementLocalFields;
+  static LocalFields = {};
+  static LocalFieldsDefaults = {};
 
   // Should only be called from `Project`.
   constructor(
@@ -13,7 +14,7 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
     node: LiveObject<FileFormat.Extrusion>
   ) {
     super(project, node, Extrusion.LocalFields);
-    Object.assign(this.fields, { type: "extrusion" }, elementLocalFieldsDefaults);
+    Object.assign(this.fields, { type: "extrusion" }, Extrusion.LocalFieldsDefaults);
   }
 
   get type() {
@@ -27,12 +28,8 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
   set height(value: number) {
     this.set("height", value);
   }
-
-  get hidden(): boolean {
-    return this.fields.hidden;
-  }
-
-  set hidden(value: boolean) {
-    this.set("hidden", value);
-  }
 }
+
+applyArcolObjectMixins(Extrusion, [HidableMixin]);
+
+export interface Extrusion extends HidableMixin {}
