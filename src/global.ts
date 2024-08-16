@@ -75,15 +75,15 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
   // a set of IDs that can change. It feels like it's designed to sync to a whole store, not just
   // part of one.
   useEffect(() => {
-    const selectedElements = getSelectedElements(selection);
-    updateValue(selectedElements);
+    updateValue(getSelectedElements(selection));
     return editor.store.subscribeObjectChange((obj, _origin, change) => {
-      if (change.type === "update" &&
-          change.property === propertyName &&
-          selectedElements.some((el) => el === obj)) {
-        updateValue(selectedElements);
+      if (!Object.keys(selection).some((id) => obj.id === id)) {
+        return;
       }
-    })
+      if (change.type !== "update" || change.property === propertyName) {
+        updateValue(getSelectedElements(selection));
+      }
+    });
   }, [selection]);
 
   const onSetValue = useCallback((value: T) => {
