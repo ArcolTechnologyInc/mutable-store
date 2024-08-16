@@ -6,6 +6,107 @@ import { deepEqual } from "./lib/deepEqual";
 export type ArcolObjectFields<I extends string> = FileFormat.ObjectShared<I> & { [key: string]: any };
 
 /**
+ * ---------------------------
+ * Listener/observer types
+ * ---------------------------
+ */
+
+export type ChangeOrigin = "local" | "remote"
+export type ObjectChange =
+  | { type: "create" | "delete" }
+  | { type: "update", property: string, oldValue: any }
+
+export type ObjectListener<T> = (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
+
+/**
+ * Similar to `ObjectListener`, but as an object and with an optional `runDeferredWork`.
+ */
+export interface ObjectObserver<T> {
+  onChange: (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
+
+  /**
+   * A sufficiently common pattern is to set a dirty flag in `onChange` and then do the work later.
+   */
+  runDeferredWork?: () => void;
+}
+
+/**
+ * -----------------------
+ * Mixin utilities
+ * -----------------------
+ *
+ * Different types of objects often share subsets of fields, and associated logic (e.g. methods,
+ * cached values, etc). We use mixins as a way to share this code.
+ *
+ * Mixins are not a first-class concept in JavaScript/TypeScript and achieved by dynamically
+ * creating class constructors. However, they are considered common and recommended practice.
+ * https://www.typescriptlang.org/docs/handbook/mixins.html
+ *
+ * Still, we use them only because this is a really core part of Arcol. We would normally still
+ * prefer to use other patterns (e.g. composition) in most regular product code to keep things simple.
+ *
+ * You can think of mixins as a partial class. All mixins still inherit from `ArcolObject`
+ * conceptually, but don't do so directly because TypeScript doesn't support diamond inheritance.
+ * Instead, we have to resort to casts or (this: T) typing.
+ *
+
+Example:
+
+```
+export class SharedPropertyMixin {
+  static MixinLocalFields = { mySharedProperty: true };
+  static MixinLocalFieldsDefaults = { mySharedProperty: ... };
+
+  get mySharedProperty(): T {
+    // Getters don't support `get(this: ArcolObject<...>)` syntax :(
+    return (this as unknown as ArcolObject<...>).getFields().mySharedProperty;
+  }
+
+  set mySharedProperty(value: T) {
+    // Setters don't support `set(this: ArcolObject<...>)` syntax :(
+    (this as unknown as ArcolObject<...>).set("mySharedProperty", value);
+  }
+
+  public helper(this: ArcolObject<...>, arg: number) { ... }
+};
+```
+
+ */
+
+
+// Gets the constructor type of a class.
+type GConstructor<T = {}> = new (...args: any[]) => T;
+
+// The fields defined in mixins could be local fields, and we need to aggregate the list of local fields.
+// That's why all mixins are required to declare their local fields in static properties so we can
+// aggregate them.
+type ArcolObjectBase = GConstructor<ArcolObject<any, any>> & {
+  LocalFields: { [key: string]: true },
+  LocalFieldsDefaults: { [key: string]: any },
+};
+type MixinClass = GConstructor<any> & {
+  MixinLocalFields?: { [key: string]: true },
+  MixinLocalFieldsDefaults?: { [key: string]: any },
+};
+
+// Copied from the TypeScript docs with modifications.
+export function applyArcolObjectMixins(derivedCtor: ArcolObjectBase, constructors: MixinClass[]) {
+  constructors.forEach((baseCtor) => {
+    // Aggregate local field information into the derived class.
+    Object.assign(derivedCtor.LocalFields, baseCtor.MixinLocalFields);
+    Object.assign(derivedCtor.LocalFieldsDefaults, baseCtor.MixinLocalFieldsDefaults);
+    Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
+      Object.defineProperty(
+        derivedCtor.prototype,
+        name,
+        Object.getOwnPropertyDescriptor(baseCtor.prototype, name) ||
+          Object.create(null)
+      );
+    });
+  });
+}
+
+/**
  * Objects that are stored in `ArcolObjectStore` are expected to extend this class. These objects
  * wrap a `LiveObject` and provide a more convenient API for accessing and modifying the object's
  * fields, in addition to allowing for local (non-synced) fields, cached values and derived values.
@@ -194,25 +295,6 @@ export class ArcolObject<
   public _internalGetNode() {
     return this.node;
   }
-}
-
-export type ChangeOrigin = "local" | "remote"
-export type ObjectChange =
-  | { type: "create" | "delete" }
-  | { type: "update", property: string, oldValue: any }
-
-export type ObjectListener<T> = (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
-
-/**
- * Similar to `ObjectListener`, but as an object and with an optional `runDeferredWork`.
- */
-export interface ObjectObserver<T> {
-  onChange: (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
-
-  /**
-   * A sufficiently common pattern is to set a dirty flag in `onChange` and then do the work later.
-   */
-  runDeferredWork?: () => void;
 }
 
 /**

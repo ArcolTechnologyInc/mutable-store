@@ -1,8 +1,8 @@
 import { LiveObject } from "@liveblocks/client";
-import { ArcolObject } from "../arcolObjectStore";
+import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, HidableMixin, applyArcolObjectMixins } from "./element";
+import { Element, HidableMixin } from "./element";
 
 export class Extrusion extends ArcolObject<ElementId, Element> {
   static LocalFields = {};

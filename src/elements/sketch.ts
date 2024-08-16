@@ -1,8 +1,8 @@
 import { LiveObject } from "@liveblocks/client";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, HidableMixin, applyArcolObjectMixins } from "./element";
-import { ArcolObject } from "../arcolObjectStore";
+import { Element, HidableMixin } from "./element";
+import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { Vec3 } from "../projectTypes";
 
 export class Sketch extends ArcolObject<ElementId, Element> {
