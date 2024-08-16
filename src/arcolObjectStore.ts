@@ -229,7 +229,6 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   protected objects = new Map<I, T>;
   protected listeners = new Set<ObjectListener<T>>();
   private makeChangesRefCount = 0;
-  private bufferedUpdates: { object: T, origin: ChangeOrigin, change: ObjectChange }[] | null = null;
 
   constructor(
     private room: Room,
@@ -390,22 +389,6 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     this.notifyListeners(object, "local", "update", key, oldValue);
   }
 
-  public startUpdateBuffer() {
-    this.bufferedUpdates = [];
-  }
-
-  public flushUpdateBuffer() {
-    const updates = this.bufferedUpdates;
-    if (updates) {
-      this.bufferedUpdates = null;
-      for (const update of updates) {
-        for (const listener of this.listeners) {
-          listener(update.object, update.origin, update.change);
-        }
-      }
-    }
-  }
-
   private onRemoteChanges(nodesUpdates: StorageUpdate[]) {
     for (const nodeUpdate of nodesUpdates) {
       // Check for new objects being added or deleted.
@@ -472,12 +455,8 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
     const change = { type, property, oldValue } as ObjectChange;
 
-    if (this.bufferedUpdates) {
-      this.bufferedUpdates.push({ object, origin, change });
-    } else {
-      for (const listener of this.listeners) {
-        listener(object, origin, change);
-      }
+    for (const listener of this.listeners) {
+      listener(object, origin, change);
     }
   }
 }

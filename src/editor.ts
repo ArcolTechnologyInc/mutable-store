@@ -55,7 +55,12 @@ export class Editor {
   }
 
   public onFrame() {
-    this.runDeferredWork();
+    // Asynchronous work should not be part of the undo/redo stack, because it's not user-initiated.
+    // If it's a problem that the changes cannot be undone, the nature of that asynchronous change
+    // should be revisited.
+    this.undoTracker.ignoreUndoRedoScope(() => {
+      this.runDeferredWork();
+    });
   }
 
   public runDeferredWork() {

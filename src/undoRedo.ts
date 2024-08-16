@@ -146,7 +146,7 @@ export class UndoHistory {
 
   private pendingChanges: HistoryEntry | null = null;
 
-  private ignoreChanges = false;
+  private ignoreChangesCounter = 0;
 
   constructor(private editor: Editor) {
     useAppState.subscribe((state, prevState) => {
@@ -178,15 +178,13 @@ export class UndoHistory {
 
     // Changes to the document made via undo should not trigger the listener that places changes
     // in the undo stack.
-    this.startIgnoringChanges();
+    this.ignoreUndoRedoScope(() => {
+      const redoEntry = applyChanges(entry);
 
-    const redoEntry = applyChanges(entry);
-
-    if (!isIgnorableSelectionChangeEntry(entry)) {
-      this.redoStack.push(redoEntry);
-    }
-
-    this.stopIgnoringChanges();
+      if (!isIgnorableSelectionChangeEntry(entry)) {
+        this.redoStack.push(redoEntry);
+      }
+    });
   }
 
   public redo() {
@@ -209,24 +207,20 @@ export class UndoHistory {
 
     // Changes to the document made via redo should not trigger the listener that places changes
     // in the undo stack.
-    this.startIgnoringChanges();
-
-    const undoEntry = applyChanges(entry);
-    this.undoStack.push(undoEntry);
-
-    this.stopIgnoringChanges();
+    this.ignoreUndoRedoScope(() => {
+      const undoEntry = applyChanges(entry);
+      this.undoStack.push(undoEntry);
+    });
   }
 
-  public startIgnoringChanges() {
-    this.ignoreChanges = true;
-  }
-
-  public stopIgnoringChanges() {
-    this.ignoreChanges = false;
+  public ignoreUndoRedoScope(cb: () => void) {
+    this.ignoreChangesCounter++;
+    cb();
+    this.ignoreChangesCounter--;
   }
 
   public onChange(store: AnyObjectStore, obj: AnyObject, origin: ChangeOrigin, change: ObjectChange) {
-    if (this.ignoreChanges || origin === "remote") {
+    if (this.ignoreChangesCounter > 0 || origin === "remote") {
       return;
     }
 
@@ -256,7 +250,7 @@ export class UndoHistory {
   }
 
   private onSelectionChange(previousSelection: ElementSelection) {
-    if (this.ignoreChanges) {
+    if (this.ignoreChangesCounter > 0) {
       return;
     }
 
