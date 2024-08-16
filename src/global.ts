@@ -4,7 +4,8 @@ import { Element } from "./elements/element";
 import { UndoHistory } from "./undoRedo";
 import { create } from "zustand";
 import { ElementId } from "./fileFormat";
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { Editor } from "./editor";
 
 export type ElementSelection = {
   [id: ElementId]: true,
@@ -12,15 +13,13 @@ export type ElementSelection = {
 
 type AppState = {
   room: Room;
-  project: ProjectStore;
-  undoTracker: UndoHistory;
+  editor: Editor;
   selection: ElementSelection;
 }
 
 export const useAppState = create<AppState>(() => ({
   room: null as any,
-  project: null as any,
-  undoTracker: null as any,
+  editor: null as any,
   selection: {},
 }));
 
@@ -28,16 +27,20 @@ export function getAppState() {
   return useAppState.getState();
 }
 
+export function getEditor() {
+  return getAppState().editor;
+}
+
 export function getSelectedElements(selection: ElementSelection) {
   return Object.keys(selection)
-    .map((id) => getAppState().project.getById(id as ElementId))
+    .map((id) => getEditor().store.getById(id as ElementId))
     .filter((x): x is Element => x !== null);
 }
 
 type SelectionProperty<T> = { value: T, isMixed: boolean } | null;
 
 export function useSelectionProperty<T>(propertyName: string): [SelectionProperty<T>, (val: T) => void] {
-  const project = useAppState(state => state.project);
+  const editor = useAppState(state => state.editor);
   const selection = useAppState(state => state.selection);
 
   const [value, setValue] = useState<SelectionProperty<T>>(null);
@@ -68,10 +71,13 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
     setValue({ value: first, isMixed: false });
   }
 
+  // We don't use `useSyncExternalStore` because it doesn't seem to easily support subscribing to
+  // a set of IDs that can change. It feels like it's designed to sync to a whole store, not just
+  // part of one.
   useEffect(() => {
     const selectedElements = getSelectedElements(selection);
     updateValue(selectedElements);
-    return project.subscribeObjectChange((obj, origin, change) => {
+    return editor.store.subscribeObjectChange((obj, _origin, change) => {
       if (change.type === "update" &&
           change.property === propertyName &&
           selectedElements.some((el) => el === obj)) {
@@ -81,7 +87,7 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
   }, [selection]);
 
   const onSetValue = useCallback((value: T) => {
-    project.makeChanges(() => {
+    editor.store.makeChanges(() => {
       const selectedElements = getSelectedElements(selection);
       for (const element of selectedElements) {
         if (propertyName in element) {

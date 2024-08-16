@@ -6,8 +6,8 @@ import { ProjectStore } from "./src/project";
 import { ElementId, FileFormat } from "./src/fileFormat";
 import { App } from "./src/ui/app";
 import { generateKeyBetween } from "fractional-indexing";
-import { UndoHistory } from "./src/undoRedo";
 import { useAppState } from "./src/global";
+import { Editor } from "./src/editor";
 
 async function init() {
   const client = createClient({
@@ -39,10 +39,16 @@ async function init() {
 
   console.log(`Entered.`);
 
-  const project = new ProjectStore(room, root as any);
-  const undoTracker = new UndoHistory(project);
+  const store = new ProjectStore(room, root as any);
+  const editor = new Editor(store);
 
-  useAppState.setState({ room, project, undoTracker });
+  const onFrame = () => {
+    editor.onFrame();
+    requestAnimationFrame(onFrame)
+  }
+  requestAnimationFrame(onFrame);
+
+  useAppState.setState({ room, editor });
 
   const reactRoot = createRoot(document.getElementById("root")!);
   reactRoot.render(<App />)

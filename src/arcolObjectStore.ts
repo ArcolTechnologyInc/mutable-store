@@ -204,6 +204,18 @@ export type ObjectChange =
 export type ObjectListener<T> = (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
 
 /**
+ * Similar to `ObjectListener`, but as an object and with an optional `runDeferredWork`.
+ */
+export interface ObjectObserver<T> {
+  onChange: (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
+
+  /**
+   * A sufficiently common pattern is to set a dirty flag in `onChange` and then do the work later.
+   */
+  runDeferredWork?: () => void;
+}
+
+/**
  * We have a general `ArcolObjectStore` class that can be instantiated because in Arcol, we have at
  * least two types of objects: Elements and board layers.
  *
@@ -217,6 +229,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   protected objects = new Map<I, T>;
   protected listeners = new Set<ObjectListener<T>>();
   private makeChangesRefCount = 0;
+  private bufferedUpdates: { object: T, origin: ChangeOrigin, change: ObjectChange }[] | null = null;
 
   constructor(
     private room: Room,
@@ -265,31 +278,51 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   }
 
   public addObject(object: T) {
-    if (!this.makingChanges()) {
-      console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
-      return;
-    }
-
-    this.rootNode.set(object.id, object._internalGetNode());
-    this.objects.set(object.id, object);
-    object.parent?._internalAddChild(object);
-    this.notifyListeners(object, "local", "create");
+    this.addObjects([object]);
   }
 
-  public removeObject(object: T) {
+  public addObjects(objects: T[]) {
     if (!this.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
 
-    for (const child of object.children) {
-      this.removeObject(child);
+    for (const object of objects) {
+      this.rootNode.set(object.id, object._internalGetNode());
+      this.objects.set(object.id, object);
     }
 
-    object.parent?._internalRemoveChild(object);
-    this.objects.delete(object.id);
-    this.rootNode.delete(object.id);
-    this.notifyListeners(object, "local", "delete");
+    for (const object of objects) {
+      object.parent?._internalAddChild(object);
+    }
+
+    for (const object of objects) {
+      this.notifyListeners(object, "local", "create");
+    }
+  }
+
+  public removeObject(obj: T) {
+    if (!this.makingChanges()) {
+      console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
+      return;
+    }
+
+    const removeRecursive = (object: T) => {
+      if (!this.objects.has(object.id)) {
+        return;
+      }
+
+      for (const child of object.children) {
+        this.removeObject(child);
+      }
+
+      object.parent?._internalRemoveChild(object);
+      this.objects.delete(object.id);
+      this.rootNode.delete(object.id);
+      this.notifyListeners(object, "local", "delete");
+    }
+
+    removeRecursive(obj);
   }
 
   /**
@@ -357,6 +390,22 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     this.notifyListeners(object, "local", "update", key, oldValue);
   }
 
+  public startUpdateBuffer() {
+    this.bufferedUpdates = [];
+  }
+
+  public flushUpdateBuffer() {
+    const updates = this.bufferedUpdates;
+    if (updates) {
+      this.bufferedUpdates = null;
+      for (const update of updates) {
+        for (const listener of this.listeners) {
+          listener(update.object, update.origin, update.change);
+        }
+      }
+    }
+  }
+
   private onRemoteChanges(nodesUpdates: StorageUpdate[]) {
     for (const nodeUpdate of nodesUpdates) {
       // Check for new objects being added or deleted.
@@ -421,12 +470,14 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete"): void
   private notifyListeners(object: T, origin: ChangeOrigin, type: "update", property: string, oldValue: any): void
   private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
-    for (const listener of this.listeners) {
-      listener(object, origin, {
-        type,
-        property,
-        oldValue,
-      } as ObjectChange);
+    const change = { type, property, oldValue } as ObjectChange;
+
+    if (this.bufferedUpdates) {
+      this.bufferedUpdates.push({ object, origin, change });
+    } else {
+      for (const listener of this.listeners) {
+        listener(object, origin, change);
+      }
     }
   }
 }

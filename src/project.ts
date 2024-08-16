@@ -1,7 +1,7 @@
 import { LiveObject, Room } from "@liveblocks/client";
 import { ElementId, FileFormat } from "./fileFormat";
 import { Sketch } from "./elements/sketch";
-import { ArcolObjectStore, ObjectListener } from "./arcolObjectStore";
+import { ArcolObjectStore, ObjectListener, ObjectObserver } from "./arcolObjectStore";
 import { Extrusion } from "./elements/extrusion";
 import { Group } from "./elements/group";
 import { Level } from "./elements/level";
@@ -9,6 +9,7 @@ import { Element } from "./elements/element";
 import { generateKeyBetween } from "fractional-indexing";
 
 export type ElementListener = ObjectListener<Element>;
+export type ElementObserver = ObjectObserver<Element>;
 
 export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
   private root: Level | null = null;
@@ -36,10 +37,6 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
     return this.root!;
   }
 
-  public subscribeElementChange(listener: ElementListener) {
-    return this.subscribeObjectChange(listener);
-  }
-
   public createSketch(): Sketch {
     const id = crypto.randomUUID() as ElementId;
     const node = new LiveObject({
@@ -65,7 +62,7 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
       height: 0,
       backingSketch: backingSketch.id,
     } satisfies FileFormat.Extrusion);
-    const extrusion = new Extrusion(this, node)
+    const extrusion = new Extrusion(this, node);
     this.addObject(extrusion);
 
     // It's consistent with our current app that there's a bi-directional link between the sketch

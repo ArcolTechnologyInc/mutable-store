@@ -3,7 +3,7 @@ import stringify from "json-stringify-pretty-compact";
 import { ProjectStore } from "../project";
 import { Element } from "../elements/element";
 import { ElementId } from "../fileFormat";
-import { getAppState, getSelectedElements, useAppState, useSelectionProperty } from "../global";
+import { ElementSelection, getAppState, getEditor, getSelectedElements, useAppState, useSelectionProperty } from "../global";
 
 type ElementRow = {
   id: ElementId,
@@ -26,7 +26,7 @@ function computeSnapshot(project: ProjectStore): StoreSnapshot {
       id: element.id,
       type: element.type,
       indent,
-      hidden: element.type === "level" ? false : element.hidden,
+      hidden: element.hidden,
       color: element.type === "sketch" ? element.color : "",
     });
     for (const child of element.children) {
@@ -68,47 +68,47 @@ function ElementRow({ element, index }: ElementRowProps) {
         useAppState.setState({ selection: { [element.id]: true } });
       }
     }
-    getAppState().undoTracker.commit();
+    getEditor().undoTracker.commit();
   }
 
   const onClickVisibility = (e: React.MouseEvent) => {
-    getAppState().project.makeChanges(() => {
-      const el = getAppState().project.getById(element.id);
+    getEditor().store.makeChanges(() => {
+      const el = getEditor().store.getById(element.id);
       if (el) {
         el.hidden = !element.hidden;
       }
     });
-    getAppState().undoTracker.commit();
+    getEditor().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickDelete = (e: React.MouseEvent) => {
-    getAppState().project.makeChanges(() => {
-      getAppState().project.getById(element.id)?.delete();
+    getEditor().store.makeChanges(() => {
+      getEditor().store.getById(element.id)?.delete();
     });
-    getAppState().undoTracker.commit();
+    getEditor().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickUp = (e: React.MouseEvent) => {
-    getAppState().project.makeChanges(() => {
-      const el = getAppState().project.getById(element.id);
+    getEditor().store.makeChanges(() => {
+      const el = getEditor().store.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() - 1);
       }
     });
-    getAppState().undoTracker.commit();
+    getEditor().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickDown = (e: React.MouseEvent) => {
-    getAppState().project.makeChanges(() => {
-      const el = getAppState().project.getById(element.id);
+    getEditor().store.makeChanges(() => {
+      const el = getEditor().store.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() + 1);
       }
     });
-    getAppState().undoTracker.commit();
+    getEditor().undoTracker.commit();
     e.stopPropagation();
   }
 
@@ -184,29 +184,29 @@ function ColorInput() {
 }
 
 export function App() {
-  const project = useAppState(state => state.project);
-  const undoTracker = useAppState(state => state.undoTracker);
+  const editor = useAppState(state => state.editor);
 
   useEffect(() => {
     document.addEventListener("keydown", (e) => {
       if (e.metaKey && e.key === "z") {
         if (e.shiftKey) {
-          undoTracker.redo();
+          editor.undoTracker.redo();
         } else {
-          undoTracker.undo();
+          editor.undoTracker.undo();
         }
         e.preventDefault();
       }
     })
-  }, []);
+  }, [editor]);
 
+  const [liveblocksPaused, setLiveblocksPaused] = useState(false);
   const [snapshot, setSnapshot] = useState<StoreSnapshot | null>(null);
   useEffect(() => {
-    setSnapshot(computeSnapshot(project));
-    return project.subscribeObjectChange(() => {
-      setSnapshot(computeSnapshot(project));
+    setSnapshot(computeSnapshot(editor.store));
+    return editor.store.subscribeObjectChange(() => {
+      setSnapshot(computeSnapshot(editor.store));
     })
-  }, [project]);
+  }, [editor]);
 
   const selection = useAppState((state) => state.selection);
   const selected = getSelectedElements(selection);
@@ -215,50 +215,56 @@ export function App() {
   const canUngroup = selected.length === 1 && selected[0]?.type === "group";
 
   const onCreateSketch = () => {
-    project.makeChanges(() => {
-      getAppState().project.createSketch();
+    editor.store.makeChanges(() => {
+      const sketch = getEditor().store.createSketch();
+      useAppState.setState({ selection: { [sketch.id]: true } });
     });
-    undoTracker.commit();
+    getEditor().undoTracker.commit();
   };
 
   const onCreateExtrusion = useCallback(() => {
     const element = selected[0];
     if (element?.type === "sketch") {
-      project.makeChanges(() => {
+      getEditor().store.makeChanges(() => {
         const parent = element.parent!;
         const index = element.indexInParent();
-        const extrusion = project.createExtrusion(element);
+        const extrusion = getEditor().store.createExtrusion(element);
         extrusion.moveToParentAtIndex(parent, index);
+        useAppState.setState({ selection: { [extrusion.id]: true } });
       });
-      undoTracker.commit();
+      getEditor().undoTracker.commit();
     }
   }, [selected])
 
   const onGroup = useCallback(() => {
-    project.makeChanges(() => {
-      const group = project.createGroup();
+    getEditor().store.makeChanges(() => {
+      const group = getEditor().store.createGroup();
       // TODO: Should determine the parent of the group via least common ancestor.
       group.setParent(selected[0].parent!);
       for (const element of selected) {
         element.setParent(group);
       }
+      useAppState.setState({ selection: { [group.id]: true } });
     });
-    undoTracker.commit();
+    getEditor().undoTracker.commit();
   }, [selected]);
 
   const onUngroup = useCallback(() => {
     const element = selected[0];
     if (element?.type === "group") {
-      project.makeChanges(() => {
+      getEditor().store.makeChanges(() => {
+        const selection: ElementSelection = {};
         const parent = element.parent;
         if (parent) {
           for (const child of element.children) {
             child.setParent(parent);
+            selection[child.id] = true;
           }
         }
         element.delete();
+        useAppState.setState({ selection });
       });
-      undoTracker.commit();
+      getEditor().undoTracker.commit();
     }
   }, [selected]);
 
@@ -273,8 +279,12 @@ export function App() {
       </div>
       <div style={{ float: "right", display: "flex", flexDirection: "column", gap: "10px" }}>
         <div>
-          <button onClick={() => { getAppState().room.disconnect() } }>Pause Liveblocks</button>
-          <button onClick={() => { getAppState().room.connect() } }>Resume Liveblocks</button>
+          {!liveblocksPaused && <button onClick={() => {
+            getAppState().room.disconnect(); setLiveblocksPaused(true);
+          } }>Pause Liveblocks</button>}
+          {liveblocksPaused && <button onClick={() => {
+            getAppState().room.connect(); setLiveblocksPaused(false);
+          } }>Resume Liveblocks</button>}
         </div>
         <div>
           <button onClick={onCreateSketch}>Create Sketch</button>
