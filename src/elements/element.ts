@@ -7,15 +7,23 @@ import { Sketch } from "./sketch";
 
 export type Element = Sketch | Extrusion | Group | Level;
 
-export class HidableMixin {
+class MixinBase {
+  get arcolObject(): ArcolObject<ElementId, Element> {
+    return this as unknown as ArcolObject<ElementId, Element>;
+  }
+}
+
+export class HidableMixin extends MixinBase {
   static MixinLocalFields = { hidden: true as const };
   static MixinLocalFieldsDefaults = { hidden: false };
 
-  get hidden(): boolean {
-    return (this as unknown as ArcolObject<ElementId, Element>).getFields().hidden;
+  get hidden(): string {
+    // should cause an error
+    return this.arcolObject.getFields().hidden;
   }
 
-  set hidden(value: boolean) {
-    (this as unknown as ArcolObject<ElementId, Element>).set("hidden", value);
+  set hidden(value: string) {
+    // should cause an error
+    this.arcolObject.set("hidden", value);
   }
 };
