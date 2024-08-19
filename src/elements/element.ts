@@ -22,7 +22,7 @@ export class HidableMixin extends MixinBase {
     return this.arcolObject.getFields().hidden;
   }
 
-  set hidden(value: string) {
+  set hidden(value: boolean) {
     // should cause an error
     this.arcolObject.set("hidden", value);
   }
