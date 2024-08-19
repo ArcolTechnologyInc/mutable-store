@@ -4,7 +4,7 @@ import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
 import { Element, HidableMixin } from "./element";
 
-export class Level extends ArcolObject<ElementId, Element> {
+export class Level extends ArcolObject {
   static LocalFields = {};
   static LocalFieldsDefaults = {};
 

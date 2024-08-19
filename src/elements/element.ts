@@ -12,10 +12,10 @@ export class HidableMixin {
   static MixinLocalFieldsDefaults = { hidden: false };
 
   get hidden(): boolean {
-    return (this as unknown as ArcolObject<ElementId, Element>).getFields().hidden;
+    return (this as unknown as ArcolObject).getFields().hidden;
   }
 
   set hidden(value: boolean) {
-    (this as unknown as ArcolObject<ElementId, Element>).set("hidden", value);
+    (this as unknown as ArcolObject).set("hidden", value);
   }
 };

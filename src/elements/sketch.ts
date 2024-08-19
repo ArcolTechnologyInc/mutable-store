@@ -5,7 +5,7 @@ import { Element, HidableMixin } from "./element";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { Vec3 } from "../projectTypes";
 
-export class Sketch extends ArcolObject<ElementId, Element> {
+export class Sketch extends ArcolObject {
   static LocalFields = {};
   static LocalFieldsDefaults = {};
 

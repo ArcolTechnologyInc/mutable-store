@@ -2,8 +2,8 @@ import { ArcolObject, ArcolObjectFields, ArcolObjectStore, ChangeOrigin, ObjectC
 import { Editor } from "./editor";
 import { ElementSelection, useAppState } from "./global";
 
-type AnyObject = ArcolObject<any, any>;
-type AnyObjectStore = ArcolObjectStore<any, any>;
+type AnyObject = ArcolObject;
+type AnyObjectStore = ArcolObjectStore;
 
 // When "op" is "create" or "delete", properties includes all of the object.
 type CreateChange = { op: "create", properties: ArcolObjectFields<any> };

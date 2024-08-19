@@ -11,7 +11,7 @@ import { generateKeyBetween } from "fractional-indexing";
 export type ElementListener = ObjectListener<Element>;
 export type ElementObserver = ObjectObserver<Element>;
 
-export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
+export class ProjectStore extends ArcolObjectStore {
   private root: Level | null = null;
 
   constructor(

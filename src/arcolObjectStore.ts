@@ -1,5 +1,6 @@
 import { LiveMap, LiveObject, Room, StorageUpdate } from "@liveblocks/client";
-import { FileFormat } from "./fileFormat";
+import { ElementId, FileFormat } from "./fileFormat";
+import { Element } from "./elements/element";
 import { generateKeyBetween } from "fractional-indexing";
 import { deepEqual } from "./lib/deepEqual";
 
@@ -80,7 +81,7 @@ type GConstructor<T = {}> = new (...args: any[]) => T;
 // The fields defined in mixins could be local fields, and we need to aggregate the list of local fields.
 // That's why all mixins are required to declare their local fields in static properties so we can
 // aggregate them.
-type ArcolObjectBase = GConstructor<ArcolObject<any, any>> & {
+type ArcolObjectBase = GConstructor<ArcolObject> & {
   LocalFields: { [key: string]: true },
   LocalFieldsDefaults: { [key: string]: any },
 };
@@ -100,7 +101,7 @@ export function applyArcolObjectMixins(derivedCtor: ArcolObjectBase, constructor
         derivedCtor.prototype,
         name,
         Object.getOwnPropertyDescriptor(baseCtor.prototype, name) ||
-          Object.create(null)
+        Object.create(null)
       );
     });
   });
@@ -113,20 +114,17 @@ export function applyArcolObjectMixins(derivedCtor: ArcolObjectBase, constructor
  *
  * <I, T> are the same as the same as the generic parameters for `ArcolObjectStore`.
  */
-export class ArcolObject<
-  I extends string,
-  T extends ArcolObject<I, T>
-> {
+export class ArcolObject {
   /**
    * Unsorted list of children of this object. Updated by ArcolObjectStore.
    */
-  private childrenSet = new Set<I>();
+  private childrenSet = new Set<ElementId>();
 
   /**
    * Most of the time, when the API consumer wants to access the children of an object, they want
    * the sorted list, which is determined by the fractional parentIndex of the children.
    */
-  private cachedChildren: T[] | null = null;
+  private cachedChildren: Element[] | null = null;
 
   /**
    * Stores the values of the fields of the object.
@@ -136,10 +134,10 @@ export class ArcolObject<
    * - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
    * - We want to be able to store (local) non-synced properties on objects.
    */
-  protected fields: ArcolObjectFields<I>;
+  protected fields: ArcolObjectFields<ElementId>;
 
   constructor(
-    protected store: ArcolObjectStore<I, T>,
+    protected store: ArcolObjectStore,
     protected node: LiveObject<any>,
     /**
      * List of fields that should not be persisted.
@@ -161,11 +159,11 @@ export class ArcolObject<
     return this.fields.parentIndex;
   }
 
-  get parent(): T | null {
+  get parent(): Element | null {
     return this.parentId ? this.store.getById(this.parentId) : null;
   }
 
-  get children(): T[] {
+  get children(): Element[] {
     if (!this.cachedChildren) {
       this.cachedChildren = [];
       for (const childId of this.childrenSet) {
@@ -196,11 +194,11 @@ export class ArcolObject<
     this.store.removeObject(this as any);
   }
 
-  public lastChild(): T | null {
+  public lastChild(): Element | null {
     return this.children[this.children.length - 1];
   }
 
-  public setParent(parent: T) {
+  public setParent(parent: Element) {
     this.set("parentId", parent.id);
     this.set("parentIndex", generateKeyBetween(parent.lastChild()?.parentIndex, null));
   }
@@ -208,7 +206,7 @@ export class ArcolObject<
   /**
    * Move this object to be the nth child of the parent. index === 0 => first child.
    */
-  public moveToParentAtIndex(parent: T, index: number) {
+  public moveToParentAtIndex(parent: Element, index: number) {
     const currentIndex = this.indexInParent();
     if (currentIndex === -1 || index === currentIndex) {
       return;
@@ -231,7 +229,7 @@ export class ArcolObject<
   }
 
   public indexInParent(): number {
-    return this.parent?.children.indexOf(this as unknown as T) ?? -1;
+    return this.parent?.children.indexOf(this as unknown as Element) ?? -1;
   }
 
   public toDebugObj() {
@@ -262,7 +260,7 @@ export class ArcolObject<
    * We could make this a symbol private to this field to enforce it more strongly, but I think it's
    * not worth the readability hit.
    */
-  public _internalAddChild(child: ArcolObject<I, T>) {
+  public _internalAddChild(child: ArcolObject) {
     this.childrenSet.add(child.id);
     this.cachedChildren = null;
   }
@@ -270,7 +268,7 @@ export class ArcolObject<
   /**
    * To be called from `ArcolObjectStore` only.
    */
-  public _internalRemoveChild(child: ArcolObject<I, T>) {
+  public _internalRemoveChild(child: ArcolObject) {
     this.childrenSet.delete(child.id);
     this.cachedChildren = null;
   }
@@ -307,9 +305,9 @@ export class ArcolObject<
  * <T> is the type of the objects that we are putting in the store, probably a discriminated union
  * of all the different subtypes of objects.
  */
-export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
-  protected objects = new Map<I, T>;
-  protected listeners = new Set<ObjectListener<T>>();
+export abstract class ArcolObjectStore {
+  protected objects = new Map<ElementId, Element>;
+  protected listeners = new Set<ObjectListener<Element>>();
   private makeChangesRefCount = 0;
 
   constructor(
@@ -317,7 +315,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     /**
      * The container node for all the objects.
      */
-    private rootNode: LiveMap<string, LiveObject<any>>,
+    private rootNode: LiveMap<ElementId, LiveObject<any>>,
   ) {
   }
 
@@ -326,7 +324,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     for (const [id, node] of this.rootNode) {
       const object = this.objectFromLiveObject(node);
       if (id === object.id) {
-        this.objects.set(id as I, object);
+        this.objects.set(id, object);
       } else {
         console.error("Error when loading document: object key does not match object id.");
       }
@@ -343,26 +341,26 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     }, { isDeep: true });
   }
 
-  public getById(id: I): T | null {
-    return this.objects.get(id) ?? null;
+  public getById(id: ElementId | string): Element | null {
+    return this.objects.get(id as ElementId) ?? null;
   }
 
-  public getObjects(): T[] {
+  public getObjects(): Element[] {
     return Array.from(this.objects.values());
   }
 
-  public subscribeObjectChange(listener: ObjectListener<T>): () => void {
+  public subscribeObjectChange(listener: ObjectListener<Element>): () => void {
     this.listeners.add(listener);
     return () => {
       this.listeners.delete(listener);
     }
   }
 
-  public addObject(object: T) {
+  public addObject(object: Element) {
     this.addObjects([object]);
   }
 
-  public addObjects(objects: T[]) {
+  public addObjects(objects: Element[]) {
     if (!this.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
@@ -382,13 +380,13 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     }
   }
 
-  public removeObject(obj: T) {
+  public removeObject(obj: Element) {
     if (!this.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
 
-    const removeRecursive = (object: T) => {
+    const removeRecursive = (object: Element) => {
       if (!this.objects.has(object.id)) {
         return;
       }
@@ -439,9 +437,9 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
    * A function that creates an object from a LiveObject. This is called when receiving new
    * remote LiveObjects or when initially populating the store.
    */
-  public abstract objectFromLiveObject(node: LiveObject<any>): T;
+  public abstract objectFromLiveObject(node: LiveObject<any>): Element;
 
-  public objectFromFields(fields: ArcolObjectFields<I>): T {
+  public objectFromFields(fields: ArcolObjectFields<ElementId>): Element {
     // We don't copy all the fields into the LiveObject because some of the fields are internal.
     // That's why we iterate over fields and set them individually instead.
     const node = new LiveObject(fields);
@@ -455,7 +453,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   }
 
   // To be called from ArcolObject only.
-  public _internalOnFieldSet(object: T, key: string, oldValue: any, newValue: any) {
+  public _internalOnFieldSet(object: Element, key: string, oldValue: any, newValue: any) {
     // TODO: Need to think some more about whether it's preferable to no-op when the value doesn't
     // change.
     if (deepEqual(oldValue, newValue)) {
@@ -463,8 +461,8 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     }
 
     if (key === "parentId") {
-      this.getById(oldValue as I)?._internalRemoveChild(object);
-      this.getById(newValue as I)?._internalAddChild(object);
+      this.getById(oldValue)?._internalRemoveChild(object);
+      this.getById(newValue)?._internalAddChild(object);
     } else if (key === "parentIndex") {
       object.parent?._internalClearChildrenCache();
     }
@@ -476,17 +474,17 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
       // Check for new objects being added or deleted.
       if (nodeUpdate.type === "LiveMap" && nodeUpdate.node === this.rootNode) {
         for (const key in nodeUpdate.updates) {
-          const object = this.getById(key as I);
+          const object = this.getById(key);
           if (object && nodeUpdate.updates[key].type === "delete") {
             object.parent?._internalRemoveChild(object);
-            this.objects.delete(key as I);
+            this.objects.delete(key as ElementId);
             this.notifyListeners(object, "remote", "delete");
           } else if (object) {
             console.error("Error receiving update: object changed for the same key.");
           } else {
             const object = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
             if (key === object.id) {
-              this.objects.set(key as I, object);
+              this.objects.set(key as ElementId, object);
               object.parent?._internalAddChild(object);
               this.notifyListeners(object, "remote", "create");
             } else {
@@ -501,11 +499,11 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
         continue;
       }
 
-      const id = nodeUpdate.node.get("id") as I;
+      const id = nodeUpdate.node.get("id");
       if (!id) {
         continue;
       }
-      const object = this.getById(id);
+      const object = this.getById(id as ElementId);
       if (object) {
         for (const key in nodeUpdate.updates) {
           const oldValue = object.get(key);
@@ -516,8 +514,8 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
           }
 
           if (key === "parentId") {
-            this.getById(oldValue as I)?._internalRemoveChild(object);
-            const newParent = newValue ? this.getById(newValue as I) : null;
+            this.getById(oldValue)?._internalRemoveChild(object);
+            const newParent = newValue ? this.getById(newValue as ElementId) : null;
             newParent?._internalAddChild(object);
           } else if (key === "parentIndex") {
             object.parent?._internalClearChildrenCache();
@@ -532,9 +530,9 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     }
   }
 
-  private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete"): void
-  private notifyListeners(object: T, origin: ChangeOrigin, type: "update", property: string, oldValue: any): void
-  private notifyListeners(object: T, origin: ChangeOrigin, type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
+  private notifyListeners(object: Element, origin: ChangeOrigin, type: "create" | "delete"): void
+  private notifyListeners(object: Element, origin: ChangeOrigin, type: "update", property: string, oldValue: any): void
+  private notifyListeners(object: Element, origin: ChangeOrigin, type: "create" | "delete" | "update", property?: string, oldValue?: any): void {
     const change = { type, property, oldValue } as ObjectChange;
 
     for (const listener of this.listeners) {
