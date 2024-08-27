@@ -245,7 +245,7 @@ export class UndoHistory {
       }
       changes[obj.id].properties[change.property] = change.oldValue;
     } else {
-      changes[obj.id] = { op: change.type, properties: obj.getFields() };
+      changes[obj.id] = { op: change.type, properties: { ...obj.getFields() } };
     }
   }
 
