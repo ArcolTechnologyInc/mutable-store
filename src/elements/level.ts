@@ -3,6 +3,7 @@ import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
 import { Element, HidableMixin } from "./element";
+import { HierarchyMixin } from "../hierarchyMixin";
 
 export class Level extends ArcolObject<ElementId, Element> {
   static LocalFields = {};
@@ -22,6 +23,6 @@ export class Level extends ArcolObject<ElementId, Element> {
   }
 }
 
-applyArcolObjectMixins(Level, [HidableMixin]);
+applyArcolObjectMixins(Level, [HierarchyMixin, HidableMixin]);
 
-export interface Level extends HidableMixin {}
+export interface Level extends HierarchyMixin<ElementId, Element>, HidableMixin {}

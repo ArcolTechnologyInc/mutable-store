@@ -26,6 +26,7 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
       if (obj.type === "level") {
         this.root = obj;
       }
+      obj.parent?._internalAddChild(obj);
     }
 
     if (!this.root) {
@@ -35,6 +36,21 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
 
   public getRootLevel() {
     return this.root!;
+  }
+
+  public removeElement(element: Element) {
+    const removeRecursive = (element: Element) => {
+      if (!this.objects.has(element.id)) {
+        return;
+      }
+
+      for (const child of element.children) {
+        this.removeObject(child);
+      }
+      this.removeObject(element);
+    }
+
+    removeRecursive(element);
   }
 
   public createSketch(): Sketch {
