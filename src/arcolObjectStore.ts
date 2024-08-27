@@ -135,6 +135,8 @@ export class ArcolObject<
    * LiveObject as the source of truth is twofold:
    * - The LiveBlocks .subscribe API doesn't provide the "before" value for updates.
    * - We want to be able to store (local) non-synced properties on objects.
+   *
+   * Setters should call `.set`, NOT mutate `fields` directly.
    */
   protected fields: ArcolObjectFields<I>;
 
