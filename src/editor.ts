@@ -2,6 +2,7 @@ import { ChangeOrigin, ObjectChange } from "./arcolObjectStore";
 import { ElementObserver, ProjectStore } from "./project";
 import { UndoHistory } from "./undoRedo";
 import { Element } from "./elements/element";
+import { HierarchyObserver } from "./hierarchyMixin";
 import { ElementId } from "./fileFormat";
 
 class DeleteEmptyExtrusionObserver implements ElementObserver {
@@ -38,14 +39,17 @@ export class Editor {
   public readonly store: ProjectStore;
   public readonly undoTracker: UndoHistory;
 
-  private observers: ElementObserver[] = [
-    { onChange: (obj, origin, change) => this.undoTracker.onChange(this.store, obj, origin, change) },
-    new DeleteEmptyExtrusionObserver(this),
-  ];
+  private observers: ElementObserver[];
 
   constructor(store: ProjectStore) {
     this.store = store;
     this.undoTracker = new UndoHistory(this);
+
+    this.observers = [
+      new HierarchyObserver(this.store),
+      { onChange: (obj, origin, change) => this.undoTracker.onChange(this.store, obj, origin, change) },
+      new DeleteEmptyExtrusionObserver(this),
+    ];
 
     this.store.subscribeObjectChange((obj, origin, change) => {
       for (const observer of this.observers) {

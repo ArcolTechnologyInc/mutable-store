@@ -2,6 +2,7 @@ import { LiveObject } from "@liveblocks/client";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
 import { Element, HidableMixin } from "./element";
+import { HierarchyMixin } from "../hierarchyMixin";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { Vec3 } from "../projectTypes";
 
@@ -39,6 +40,6 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   }
 }
 
-applyArcolObjectMixins(Sketch, [HidableMixin]);
+applyArcolObjectMixins(Sketch, [HierarchyMixin, HidableMixin]);
 
-export interface Sketch extends HidableMixin {}
+export interface Sketch extends HierarchyMixin<ElementId, Element>, HidableMixin {}
