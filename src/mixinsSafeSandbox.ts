@@ -173,11 +173,11 @@ class _ArcolGroup extends ArcolElementBase<HierarchyFields<ArcolElementId>> {
 const ArcolGroup = ArcolHierarchyMixin(_ArcolGroup)
 type ArcolGroupType = InstanceType<typeof ArcolGroup>
 
-function switchOnType(element: ArcolElementBase<any>,
+function switchOnType<T>(element: ArcolElementBase<any>,
   callbacks: {
-    sketch: (element: ArcolSketchType) => void,
-    extrusion: (element: ArcolExtrusionType) => void,
-    group: (element: ArcolGroupType) => void
+    sketch: (element: ArcolSketchType) => T,
+    extrusion: (element: ArcolExtrusionType) => T,
+    group: (element: ArcolGroupType) => T
   }
 ) {
   switch (element.type) {
@@ -207,15 +207,10 @@ sketch.parentId = group.id
 
 const children = group.children;
 for (const child of children) {
-  switchOnType(child, {
-    sketch: (element) => {
-      console.log(element.translate)
-    },
-    extrusion: (element) => {
-      console.log(element.height)
-    },
-    group: (element) => {
-      console.log(element.children)
-    }
-  })
+  // You could also check whether it matches a particular type via .type === and casting
+  console.log(switchOnType<any>(child, {
+    sketch: (element) => element.translate,
+    extrusion: (element) => element.height,
+    group: (element) => element.children
+  }))
 }
