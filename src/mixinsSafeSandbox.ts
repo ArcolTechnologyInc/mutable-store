@@ -148,7 +148,7 @@ class _ArcolSketch extends ArcolElementBase<SketchFields & HideableFields & Hier
   }
 }
 
-const ArcolSketch = SketchMixin(ArcolHierarchyMixin(_ArcolSketch))
+const ArcolSketch = HideableMixin(SketchMixin(ArcolHierarchyMixin(_ArcolSketch)))
 type ArcolSketchType = InstanceType<typeof ArcolSketch>
 
 class _ArcolExtrusion extends ArcolElementBase<ExtrusionFields & HideableFields & HierarchyFields<ArcolElementId>> {
@@ -163,14 +163,15 @@ class _ArcolExtrusion extends ArcolElementBase<ExtrusionFields & HideableFields 
 const ArcolExtrusion = ExtrusionMixin(ArcolHierarchyMixin(HideableMixin(_ArcolExtrusion)))
 type ArcolExtrusionType = InstanceType<typeof ArcolExtrusion>
 
-class _ArcolGroup extends ArcolElementBase<HierarchyFields<ArcolElementId>> {
+class _ArcolGroup extends ArcolElementBase<HideableFields & HierarchyFields<ArcolElementId>> {
   type = "group"
   fields = {
+    ...HideableDefaults,
     ...HierarchyDefaults
   }
 }
 
-const ArcolGroup = ArcolHierarchyMixin(_ArcolGroup)
+const ArcolGroup = HideableMixin(ArcolHierarchyMixin(_ArcolGroup))
 type ArcolGroupType = InstanceType<typeof ArcolGroup>
 
 function switchOnType<T>(element: ArcolElementBase<any>,
