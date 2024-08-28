@@ -2,20 +2,19 @@ import { LiveObject } from "@liveblocks/client";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, HidableMixin } from "./element";
+import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 
 export class Group extends ArcolObject<ElementId, Element> {
-  static LocalFields = {};
-  static LocalFieldsDefaults = {};
+  static LocalFieldsWithDefaults = {};
 
   // Should only be called from `Project`.
   constructor(
     project: ProjectStore,
     node: LiveObject<FileFormat.Group>
   ) {
-    super(project, node, Group.LocalFields);
-    Object.assign(this.fields, { type: "group" }, Group.LocalFieldsDefaults);
+    super(project, node, Group.LocalFieldsWithDefaults);
+    Object.assign(this.fields, { type: "group" }, Group.LocalFieldsWithDefaults);
   }
 
   get type() {
@@ -23,6 +22,6 @@ export class Group extends ArcolObject<ElementId, Element> {
   }
 }
 
-applyArcolObjectMixins(Group, [HierarchyMixin, HidableMixin]);
+applyArcolObjectMixins(Group, [HierarchyMixin, HideableMixin]);
 
-export interface Group extends HierarchyMixin<ElementId, Element>, HidableMixin {}
+export interface Group extends HierarchyMixin<ElementId, Element>, HideableMixin {}

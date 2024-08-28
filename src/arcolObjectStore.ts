@@ -81,20 +81,17 @@ type GConstructor<T = {}> = new (...args: any[]) => T;
 // That's why all mixins are required to declare their local fields in static properties so we can
 // aggregate them.
 type ArcolObjectBase = GConstructor<ArcolObject<any, any>> & {
-  LocalFields: { [key: string]: true },
-  LocalFieldsDefaults: { [key: string]: any },
+  LocalFieldsWithDefaults: { [key: string]: any },
 };
 type MixinClass = GConstructor<any> & {
-  MixinLocalFields?: { [key: string]: true },
-  MixinLocalFieldsDefaults?: { [key: string]: any },
+  MixinLocalFieldsWithDefaults?: { [key: string]: any },
 };
 
 // Copied from the TypeScript docs with modifications.
 export function applyArcolObjectMixins(derivedCtor: ArcolObjectBase, constructors: MixinClass[]) {
   constructors.forEach((baseCtor) => {
     // Aggregate local field information into the derived class.
-    Object.assign(derivedCtor.LocalFields, baseCtor.MixinLocalFields);
-    Object.assign(derivedCtor.LocalFieldsDefaults, baseCtor.MixinLocalFieldsDefaults);
+    Object.assign(derivedCtor.LocalFieldsWithDefaults, baseCtor.MixinLocalFieldsWithDefaults);
     Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
       Object.defineProperty(
         derivedCtor.prototype,
@@ -128,6 +125,7 @@ export class ArcolObject<
    * Setters should call `.set`, NOT mutate `fields` directly.
    */
   protected fields: ArcolObjectFields<I>;
+  protected localFields: { [key: string]: true };
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
@@ -135,9 +133,13 @@ export class ArcolObject<
     /**
      * List of fields that should not be persisted.
      */
-    protected localFields: { [key: string]: true } = {},
+    localFieldsWithDefaults: { [key: string]: unknown },
   ) {
     this.fields = node.toObject();
+    this.localFields = {};
+    for (const key in localFieldsWithDefaults) {
+      this.localFields[key] = true;
+    }
   }
 
   get id() {

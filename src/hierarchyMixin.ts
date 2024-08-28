@@ -1,5 +1,6 @@
 import { generateKeyBetween } from "fractional-indexing";
 import { ArcolObject, ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectObserver } from "./arcolObjectStore";
+import { FileFormat } from "./fileFormat";
 
 /**
  * Allows creating a parent-child relationship using the parentId and parentIndex fields.
@@ -10,8 +11,7 @@ import { ArcolObject, ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectObserv
  *   observer to run considering that subsequent observers are likely to read the children list.
  */
 export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & HierarchyMixin<I, T>> {
-  static MixinLocalFields = {};
-  static MixinLocalFieldsDefaults = {};
+  static MixinLocalFieldsWithDefaults = {};
 
   /**
    * Unsorted list of children of this object. Updated by ArcolObjectStore.
@@ -35,11 +35,11 @@ export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & Hier
     return this as unknown as T;
   }
 
-  get parentId() {
+  get parentId(): FileFormat.HierarchyMixin<I>["parentId"] {
     return this.self.getFields().parentId;
   }
 
-  get parentIndex() {
+  get parentIndex(): FileFormat.HierarchyMixin<I>["parentIndex"] {
     return this.self.getFields().parentIndex;
   }
 

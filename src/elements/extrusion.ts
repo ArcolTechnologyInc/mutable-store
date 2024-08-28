@@ -2,35 +2,34 @@ import { LiveObject } from "@liveblocks/client";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, HidableMixin } from "./element";
+import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 
 export class Extrusion extends ArcolObject<ElementId, Element> {
-  static LocalFields = {};
-  static LocalFieldsDefaults = {};
+  static LocalFieldsWithDefaults = {};
 
   // Should only be called from `Project`.
   constructor(
     project: ProjectStore,
     node: LiveObject<FileFormat.Extrusion>
   ) {
-    super(project, node, Extrusion.LocalFields);
-    Object.assign(this.fields, { type: "extrusion" }, Extrusion.LocalFieldsDefaults);
+    super(project, node, Extrusion.LocalFieldsWithDefaults);
+    Object.assign(this.fields, { type: "extrusion" }, Extrusion.LocalFieldsWithDefaults);
   }
 
   get type() {
     return "extrusion" as const;
   }
 
-  get height(): number {
+  get height(): FileFormat.Extrusion["height"] {
     return this.fields.height;
   }
 
-  set height(value: number) {
+  set height(value: FileFormat.Extrusion["height"]) {
     this.set("height", value);
   }
 }
 
-applyArcolObjectMixins(Extrusion, [HierarchyMixin, HidableMixin]);
+applyArcolObjectMixins(Extrusion, [HierarchyMixin, HideableMixin]);
 
-export interface Extrusion extends HierarchyMixin<ElementId, Element>, HidableMixin {}
+export interface Extrusion extends HierarchyMixin<ElementId, Element>, HideableMixin {}
