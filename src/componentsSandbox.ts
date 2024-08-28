@@ -39,6 +39,10 @@ class HierarchyComponent<TID, TElement extends ElementBase<TID, any>> {
 
 class ArcolHierarchyComponent extends HierarchyComponent<ArcolElementId, ArcolElement> { }
 
+interface IArcolHierarchyElement {
+  hierarchy: ArcolHierarchyComponent
+}
+
 type HideableFields = {
   hidden: boolean
 }
@@ -58,6 +62,10 @@ class HideableComponent {
   set hidden(value: boolean) {
     this._fields.hidden = value;
   }
+}
+
+interface IHideableElement {
+  hideable: HideableComponent
 }
 
 type SketchFields = {
@@ -91,6 +99,10 @@ class SketchComponent {
   }
 }
 
+interface ISketchElement {
+  sketch: SketchComponent
+}
+
 type ExtrusionFields = {
   height: number
   sketchId: string | null
@@ -122,12 +134,16 @@ class ExtrusionComponent {
   }
 }
 
+interface IExtrusionElement {
+  extrusion: ExtrusionComponent
+}
+
 //////////////////////////////////////////////////////////////////////////////////////////
 // Elements
 
 class ArcolSketch extends ArcolElementBase<
   SketchFields & HideableFields & ArcolHierarchyFields
-> {
+> implements IHideableElement, ISketchElement, IArcolHierarchyElement {
   fields = {
     ...SketchDefaults,
     ...HideableDefaults,
@@ -140,8 +156,8 @@ class ArcolSketch extends ArcolElementBase<
 
 class ArcolExtrusion extends ArcolElementBase<
   ExtrusionFields & HideableFields & ArcolHierarchyFields
-> {
-  fields: ExtrusionFields & HideableFields & ArcolHierarchyFields = {
+> implements IHideableElement, IExtrusionElement, IArcolHierarchyElement {
+  fields = {
     ...ExtrusionDefaults,
     ...HideableDefaults,
     ...ArcolHierarchyDefaults
