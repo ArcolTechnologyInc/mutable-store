@@ -166,3 +166,13 @@ class ArcolExtrusion extends ArcolElementBase<
   extrusion = new ExtrusionComponent(this.fields);
   hierarchy = new ArcolHierarchyComponent(this.fields);
 }
+
+const sketch = new ArcolSketch('a' as ArcolElementId)
+const extrusion = new ArcolExtrusion('b' as ArcolElementId)
+
+extrusion.extrusion.sketchId = sketch.id
+extrusion.extrusion.height = 10
+extrusion.hideable.hidden = true
+
+sketch.sketch.translate = [1, 2, 3]
+sketch.sketch.color = '#000'
