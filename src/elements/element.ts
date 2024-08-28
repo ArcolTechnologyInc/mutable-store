@@ -12,7 +12,7 @@ interface Hideable {
 }
 
 export class HideableMixin {
-  static MixinLocalFieldsWithDefaults = { hidden: false } satisfies Partial<Hideable>;
+  static LocalFieldsWithDefaults = { hidden: false } satisfies Partial<Hideable>;
 
   get hidden(): Hideable["hidden"] {
     return (this as unknown as ArcolObject<ElementId, Element>).getFields().hidden;

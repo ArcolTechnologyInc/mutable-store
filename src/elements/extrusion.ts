@@ -6,7 +6,9 @@ import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 
 export class Extrusion extends ArcolObject<ElementId, Element> {
-  static LocalFieldsWithDefaults = {};
+  static LocalFieldsWithDefaults = {
+    ...HideableMixin.LocalFieldsWithDefaults,
+  };
 
   // Should only be called from `Project`.
   constructor(

@@ -4,10 +4,11 @@ import { ProjectStore } from "../project";
 import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
-import { Vec3 } from "../projectTypes";
 
 export class Sketch extends ArcolObject<ElementId, Element> {
-  static LocalFieldsWithDefaults = {};
+  static LocalFieldsWithDefaults = {
+    ...HideableMixin.LocalFieldsWithDefaults,
+  };
 
   // Should only be called from `Project`.
   constructor(

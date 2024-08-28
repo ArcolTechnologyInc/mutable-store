@@ -80,18 +80,19 @@ type GConstructor<T = {}> = new (...args: any[]) => T;
 // The fields defined in mixins could be local fields, and we need to aggregate the list of local fields.
 // That's why all mixins are required to declare their local fields in static properties so we can
 // aggregate them.
-type ArcolObjectBase = GConstructor<ArcolObject<any, any>> & {
-  LocalFieldsWithDefaults: { [key: string]: any },
+type ArcolObjectBase<T extends object> = GConstructor<ArcolObject<any, any>> & {
+  LocalFieldsWithDefaults: T,
 };
-type MixinClass = GConstructor<any> & {
-  MixinLocalFieldsWithDefaults?: { [key: string]: any },
+type MixinClass<T extends object> = GConstructor<any> & {
+  LocalFieldsWithDefaults?: T,
 };
 
 // Copied from the TypeScript docs with modifications.
-export function applyArcolObjectMixins(derivedCtor: ArcolObjectBase, constructors: MixinClass[]) {
+export function applyArcolObjectMixins<
+  MixinLocalFields extends object,
+  BaseLocalFields extends Record<keyof MixinLocalFields, any>
+>(derivedCtor: ArcolObjectBase<BaseLocalFields>, constructors: MixinClass<MixinLocalFields>[]) {
   constructors.forEach((baseCtor) => {
-    // Aggregate local field information into the derived class.
-    Object.assign(derivedCtor.LocalFieldsWithDefaults, baseCtor.MixinLocalFieldsWithDefaults);
     Object.getOwnPropertyNames(baseCtor.prototype).forEach((name) => {
       Object.defineProperty(
         derivedCtor.prototype,
