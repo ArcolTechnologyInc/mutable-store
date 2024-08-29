@@ -24,7 +24,7 @@ class BarComponent {
   }
 }
 
-function Component(component: any, componentName: string) {
+function Component(component: any) {
   return function (target: any) {
     const descriptors = Object.getOwnPropertyDescriptors(component.prototype);
     for (const key in descriptors) {
@@ -35,17 +35,22 @@ function Component(component: any, componentName: string) {
   };
 }
 
-@Component(FooComponent, "fooComponent")
-@Component(BarComponent, "barComponent")
-class Entity {
-  constructor() {}
-  declare foo: string;
+@Component(FooComponent)
+@Component(BarComponent)
+class _Entity {
+  constructor() { }
 }
+
+type DefaultConstructor<T> = new () => T
+
+const Entity = _Entity as unknown as DefaultConstructor<_Entity & Omit<BarComponent, "constructor"> & Omit<FooComponent, "constructor">>
 
 const e = new Entity()
 console.log(e)
 e.foo = "hello"
 e.bar = 2
+//@ts-expect-error
+e.asdf = 123
 
 const e2 = new Entity()
 console.log(e2)
