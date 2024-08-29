@@ -40,22 +40,28 @@ namespace Z {
     }
   }
 
-  type GenericConstructor<T> = new (...args: any[]) => T
+  type BaseConstructor<F, T> = new (f: F, ...args: any[]) => T
 
   function FlattenComponents<
     TBaseFields,
     TBase extends Base<TBaseFields>,
     TComponentFields,
     TComponent extends Base<TComponentFields>
-  >(Base: GenericConstructor<TBase>, componentField: string, Component: GenericConstructor<TComponent>)
-    : GenericConstructor<
-      Omit<InstanceType<GenericConstructor<TBase>>, "constructor">
-      & Omit<InstanceType<GenericConstructor<TComponent>>, "constructor">
+  >(
+    Base: BaseConstructor<TBaseFields, TBase>,
+    componentField: string,
+    Component: BaseConstructor<TComponentFields, TComponent>
+  )
+    : BaseConstructor<
+      TBaseFields & TComponentFields,
+      Omit<InstanceType<BaseConstructor<TBaseFields, TBase>>, "constructor">
+      & Omit<InstanceType<BaseConstructor<TComponentFields, TComponent>>, "constructor">
+      & Base<TBaseFields & TComponentFields>
     > {
     // @ts-ignore
     return class extends Base {
-      constructor(...args: any[]) {
-        super(...args)
+      constructor(fields: TBaseFields & TComponentFields, ...args: any[]) {
+        super(fields, ...args)
 
         // @ts-ignore
         const component = this[componentField] as TComponent
@@ -98,7 +104,7 @@ namespace Z {
     FlattenComponents(FlattenComponents(
       class _Entity extends Base<{ foo: string }> {
         fooComponent: FooComponent = new FooComponent(this.fields)
-        constructor(fields: { foo: string, bar: number }) {
+        constructor(fields: { foo: string }) {
           super(fields)
         }
       }, "fooComponent", FooComponent), "fooComponent", FooComponent)
@@ -114,20 +120,22 @@ namespace Z {
       }, "fooComponent", FooComponent)
 
   try {
-    const errorEntity = new EntityWithError();
+    const errorEntity = new EntityWithError({ foo: "hello" });
     throw new Error("should not get here")
   } catch (e) {
     console.log("correct re: duplicate property")
   }
 
-  const e = new Entity()
+  const e = new Entity({ foo: "asdf", bar: 2 })
   console.log("e", e)
+  e.fooComponent.foo = "hello1"
+  console.log("e.fooComponent.foo", e.fooComponent.foo)
   e.foo = "hello"
   e.bar = 2
   //@ts-expect-error
   e.asdf = 123
 
-  const e2 = new Entity()
+  const e2 = new Entity({ foo: "asdf", bar: 4 })
   console.log(e2)
   e2.foo = "bye"
   e2.bar = 4
@@ -148,7 +156,7 @@ namespace Z {
   console.log("e.barSquared()", e.barSquared())
   console.log("e.barCubed())", e.barCubed())
 
-  const e3 = new EntityWithFoo()
+  const e3 = new EntityWithFoo({ foo: "asdf" })
   console.log("e3", e3)
   e3.foo = "hello"
   console.log("e3.foo", e3.foo)

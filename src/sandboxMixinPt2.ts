@@ -42,7 +42,6 @@ namespace Z {
       Omit<InstanceType<TBase>, "constructor">
       & Omit<InstanceType<TComponent>, "constructor">
     > {
-    // @ts-ignore
     return class extends Base {
       constructor(...args: any[]) {
         super(...args)
@@ -55,15 +54,6 @@ namespace Z {
             Object.defineProperty(this, key, descriptors[key]);
           }
         }
-      }
-    }
-  }
-
-  function NoOpMixin<TBase extends GenericConstructor<any>>(Base: TBase)
-    : TBase {
-    return class extends Base {
-      constructor(...args: any[]) {
-        super(...args)
       }
     }
   }
