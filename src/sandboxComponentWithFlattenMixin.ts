@@ -55,8 +55,10 @@ namespace Z {
     : BaseConstructor<
       TBaseFields & TComponentFields,
       Omit<InstanceType<BaseConstructor<TBaseFields, TBase>>, "constructor">
-      & Omit<InstanceType<BaseConstructor<TComponentFields, TComponent>>, "constructor">
-      & Base<TBaseFields & TComponentFields>
+      &
+      Omit<InstanceType<BaseConstructor<TComponentFields, TComponent>>, "constructor">
+      &
+      Base<TBaseFields & TComponentFields>
     > {
     // @ts-ignore
     return class extends Base {

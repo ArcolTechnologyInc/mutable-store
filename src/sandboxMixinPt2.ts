@@ -1,50 +1,65 @@
 namespace Z {
 
-  class Foo {
-    private _foo: string = "foo";
-    constructor() { }
+  abstract class Base<T> {
+    fields: T
+    constructor(fields: T) {
+      this.fields = fields
+    }
+  }
+
+  class Foo extends Base<{ foo: string }> {
+    constructor(fields: { foo: string }) {
+      super(fields)
+    }
     get foo() {
-      return this._foo;
+      return this.fields.foo;
     }
     set foo(value: string) {
-      this._foo = value;
+      this.fields.foo = value;
     }
     helloFoo() {
-      return "hello " + this._foo
+      return "hello " + this.fields.foo
     }
   }
 
-  class Bar {
-    private _bar: number = 1;
-    constructor() { }
+  class Bar extends Base<{ bar: number }> {
+    constructor(fields: { bar: number }) {
+      super(fields)
+    }
     get bar() {
-      return this._bar;
+      return this.fields.bar;
     }
     set bar(value: number) {
-      this._bar = value;
+      this.fields.bar = value;
     }
     barSquared() {
-      return this._bar * this._bar;
+      return this.fields.bar * this.fields.bar;
     }
     barCubed() {
-      return this._bar * this._bar * this._bar;
+      return this.fields.bar * this.fields.bar * this.fields.bar;
     }
   }
 
-  type GenericConstructor<T> = new (...args: any[]) => T
-  type DefaultConstructor<T> = new () => T
+  type BaseConstructor<F, T> = new (f: F, ...args: any[]) => T
 
   function ComponentMixin<
-    TBase extends GenericConstructor<any>,
-    TComponent extends DefaultConstructor<any>
-  >(Base: TBase, Component: TComponent)
-    : GenericConstructor<
-      Omit<InstanceType<TBase>, "constructor">
-      & Omit<InstanceType<TComponent>, "constructor">
-    > {
+    TBaseFields,
+    TBase extends Base<TBaseFields>,
+    TComponentFields,
+    TComponent extends Base<TComponentFields>
+  >(
+    Base: BaseConstructor<TBaseFields, TBase>,
+    Component: BaseConstructor<TComponentFields, TComponent>
+  ): BaseConstructor<
+    TBaseFields & TComponentFields,
+    Omit<InstanceType<BaseConstructor<TBaseFields, TBase>>, "constructor">
+    &
+    Omit<InstanceType<BaseConstructor<TComponentFields, TComponent>>, "constructor">
+  > {
+    //@ts-expect-error
     return class extends Base {
-      constructor(...args: any[]) {
-        super(...args)
+      constructor(f: TBaseFields & TComponentFields, ...args: any[]) {
+        super(f, ...args)
         const descriptors = Object.getOwnPropertyDescriptors(Component.prototype);
         for (const key in descriptors) {
           if (key !== "constructor") {
@@ -58,22 +73,22 @@ namespace Z {
     }
   }
 
-  const Entity = ComponentMixin(ComponentMixin(class { }, Foo), Bar)
-  const EntityWithFoo = ComponentMixin(class { }, Foo)
-  const EntityWithBar = ComponentMixin(class { }, Bar)
+  const Entity = ComponentMixin(ComponentMixin(class extends Base<{}> { }, Foo), Bar)
+  const EntityWithFoo = ComponentMixin(class extends Base<{}> { }, Foo)
+  const EntityWithBar = ComponentMixin(class extends Base<{}> { }, Bar)
 
   const EntityWithError = ComponentMixin(
-    ComponentMixin(class { }, Foo),
+    class extends Base<{}> { },
     Foo
   )
 
   try {
-    const errorEntity = new EntityWithError();
+    const errorEntity = new EntityWithError({foo: "asdf"});
     throw new Error("should not get here")
   } catch (e) {
     console.log("correct re: duplicate property")
   }
-  const e = new Entity()
+  const e = new Entity({foo: "asdf", bar: 123})
   //@ts-expect-error
   console.log("e._foo", e._foo)
   e.foo = "hello"
@@ -81,7 +96,7 @@ namespace Z {
   //@ts-expect-error
   e.asdf = 123
 
-  const e2 = new Entity()
+  const e2 = new Entity({foo: "asdf", bar: 123})
   console.log(e2)
   e2.foo = "bye"
   e2.bar = 4
@@ -102,7 +117,7 @@ namespace Z {
   console.log("e.barSquared()", e.barSquared())
   console.log("e.barCubed())", e.barCubed())
 
-  const e3 = new EntityWithFoo()
+  const e3 = new EntityWithFoo({foo: "asdf"})
   console.log("e3", e3)
   e3.foo = "hello"
   console.log("e3.foo", e3.foo)
@@ -117,7 +132,7 @@ namespace Z {
     console.log("correct re: e3.bar")
   }
 
-  const e4 = new EntityWithBar()
+  const e4 = new EntityWithBar({bar: 123})
   console.log("e4", e4)
   e4.bar = 2
   //@ts-expect-error
