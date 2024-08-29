@@ -91,16 +91,18 @@ namespace Z {
     }
   }
 
+  class _Entity extends Base<{ foo: string, bar: number }> {
+    fooComponent: FooComponent = new FooComponent(this.fields)
+    barComponent: BarComponent = new BarComponent(this.fields)
+
+    constructor(fields: { foo: string, bar: number }) {
+      super(fields)
+    }
+  }
+
   const Entity =
     FlattenComponents(FlattenComponents(
-      class _Entity extends Base<{ foo: string, bar: number }> {
-        fooComponent: FooComponent = new FooComponent(this.fields)
-        barComponent: BarComponent = new BarComponent(this.fields)
-
-        constructor(fields: { foo: string, bar: number }) {
-          super(fields)
-        }
-      }, "fooComponent", FooComponent), "barComponent", BarComponent)
+      _Entity, "fooComponent", FooComponent), "barComponent", BarComponent)
 
   const EntityWithError =
     FlattenComponents(FlattenComponents(

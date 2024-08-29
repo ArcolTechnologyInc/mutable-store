@@ -176,3 +176,4 @@ extrusion.hideable.hidden = true
 
 sketch.sketch.translate = [1, 2, 3]
 sketch.sketch.color = '#000'
+sketch.hideable.hidden = true

@@ -36,6 +36,9 @@ namespace Z {
       return this.fields.bar * this.fields.bar;
     }
     barCubed() {
+      return this.barCubedHelper();
+    }
+    private barCubedHelper() {
       return this.fields.bar * this.fields.bar * this.fields.bar;
     }
   }
