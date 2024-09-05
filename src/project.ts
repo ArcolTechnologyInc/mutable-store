@@ -76,14 +76,9 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
       parentId: backingSketch.parentId,
       parentIndex: generateKeyBetween(backingSketch.parent!.lastChild()?.parentIndex, null),
       height: 0,
-      backingSketch: backingSketch.id,
     } satisfies FileFormat.Extrusion);
     const extrusion = new Extrusion(this, node);
     this.addObject(extrusion);
-
-    // It's consistent with our current app that there's a bi-directional link between the sketch
-    // and the extrusion, but this decision should be revisited.
-    backingSketch.setParent(extrusion);
     return extrusion;
   }
 

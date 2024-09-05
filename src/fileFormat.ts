@@ -30,11 +30,14 @@ export namespace FileFormat {
   export type ObjectShared<I> = {
     id: I;
     type: string;
+  }
+
+  export type HierarchyMixin<I> = {
     parentId: I | null;
     parentIndex: string;
   }
 
-  export type ElementShared = ObjectShared<ElementId>;
+  export type ElementShared = ObjectShared<ElementId> & HierarchyMixin<ElementId>;
 
   export type Sketch = ElementShared & {
     type: "sketch";
@@ -45,7 +48,6 @@ export namespace FileFormat {
   export type Extrusion = ElementShared & {
     type: "extrusion";
     height: number;
-    backingSketch: ElementId;
   }
 
   export type Group = ElementShared & {

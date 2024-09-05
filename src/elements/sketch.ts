@@ -1,45 +1,45 @@
 import { LiveObject } from "@liveblocks/client";
 import { ElementId, FileFormat } from "../fileFormat";
 import { ProjectStore } from "../project";
-import { Element, HidableMixin } from "./element";
+import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
-import { Vec3 } from "../projectTypes";
 
 export class Sketch extends ArcolObject<ElementId, Element> {
-  static LocalFields = {};
-  static LocalFieldsDefaults = {};
+  static LocalFieldsWithDefaults = {
+    ...HideableMixin.LocalFieldsWithDefaults,
+  };
 
   // Should only be called from `Project`.
   constructor(
     project: ProjectStore,
     node: LiveObject<FileFormat.Sketch>
   ) {
-    super(project, node, Sketch.LocalFields);
-    Object.assign(this.fields, { type: "sketch" }, Sketch.LocalFieldsDefaults);
+    super(project, node, Sketch.LocalFieldsWithDefaults);
+    Object.assign(this.fields, { type: "sketch" }, Sketch.LocalFieldsWithDefaults);
   }
 
   get type() {
     return "sketch" as const;
   }
 
-  get translate(): Vec3 {
+  get translate(): FileFormat.Sketch["translate"] {
     return this.fields.translate;
   }
 
-  set translate(value: Vec3) {
+  set translate(value: FileFormat.Sketch["translate"]) {
     this.set("translate", value);
   }
 
-  get color(): `#${string}` {
+  get color(): FileFormat.Sketch["color"] {
     return this.fields.color;
   }
 
-  set color(value: `#${string}`) {
+  set color(value: FileFormat.Sketch["color"]) {
     this.set("color", value);
   }
 }
 
-applyArcolObjectMixins(Sketch, [HierarchyMixin, HidableMixin]);
+applyArcolObjectMixins(Sketch, [HierarchyMixin, HideableMixin]);
 
-export interface Sketch extends HierarchyMixin<ElementId, Element>, HidableMixin {}
+export interface Sketch extends HierarchyMixin<ElementId, Element>, HideableMixin {}
