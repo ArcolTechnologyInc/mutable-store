@@ -33,7 +33,7 @@ export function getEditor() {
 
 export function getSelectedElements(selection: ElementSelection) {
   return Object.keys(selection)
-    .map((id) => getEditor().store.getById(id as ElementId))
+    .map((id) => getEditor().project.getById(id as ElementId))
     .filter((x): x is Element => x !== null);
 }
 
@@ -76,7 +76,7 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
   // part of one.
   useEffect(() => {
     updateValue(getSelectedElements(selection));
-    return editor.store.subscribeObjectChange((obj, _origin, change) => {
+    return editor.project.subscribeObjectChange((obj, _origin, change) => {
       if (!Object.keys(selection).some((id) => obj.id === id)) {
         return;
       }
@@ -87,7 +87,7 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
   }, [selection]);
 
   const onSetValue = useCallback((value: T) => {
-    editor.store.makeChanges(() => {
+    editor.makeChanges(() => {
       const selectedElements = getSelectedElements(selection);
       for (const element of selectedElements) {
         if (propertyName in element) {
@@ -98,4 +98,42 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
   }, [selection]);
 
   return [value, onSetValue];
+}
+
+export function useRelationsFrom(elementId: ElementId): [{ [id: ElementId]: true }, (a: ElementId, b: ElementId, relation: boolean) => void] {
+  const editor = useAppState(state => state.editor);
+
+  const [relations, setRelations] = useState<{ [id: ElementId]: true }>({});
+
+  const updateRelations = () => {
+    const relations: { [id: ElementId]: true } = {};
+    for (const relation of editor.relations.getRelationsFromA(elementId)) {
+      relations[relation.keyB] = true;
+    }
+    setRelations(relations);
+  }
+
+  useEffect(() => {
+    updateRelations();
+    return editor.relations.subscribeObjectChange((obj, _origin, change) => {
+      if (obj.keyA === elementId || obj.keyB === elementId) {
+        updateRelations();
+      }
+    });
+  }, [elementId, editor]);
+
+  const onSetRelation = (a: ElementId, b: ElementId, relation: boolean) => {
+    editor.makeChanges(() => {
+      if (relation) {
+        const elementA = editor.project.getById(a);
+        const elementB = editor.project.getById(b);
+        if (elementA && elementB) {
+          editor.relations.addElementRelation(elementA, elementB);
+        }
+      } else {
+        editor.relations.removeElementRelation(a, b);
+      }
+    });
+  };
+  return [relations, onSetRelation]
 }

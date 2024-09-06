@@ -12,6 +12,7 @@ export type Brand<T, BrandString extends string> = T & {
 };
 
 export type ElementId = Brand<string, "element-id">;
+export type ElementRelationKey = Brand<string, "element-element-relation">;
 
 /**
  * Just a simple example of a file format.
@@ -19,17 +20,8 @@ export type ElementId = Brand<string, "element-id">;
 export namespace FileFormat {
   export type Vec3 = [number, number, number];
 
-  /**
-   * Note that this is making the `parent` relationship a first-class property of all objects.
-   * Furthermore, all children as sorted, even in use cases where it probably doesn't matter too
-   * much.
-   *
-   * I think the extra overhead of maintaining this relationship is worth it for the simplicity
-   * of making all objects consistent, and for future proofing.
-   */
   export type ObjectShared<I> = {
     id: I;
-    type: string;
   }
 
   export type HierarchyMixin<I> = {
@@ -60,8 +52,13 @@ export namespace FileFormat {
 
   export type Element = Sketch | Extrusion | Group | Level;
 
+  export type ElementRelation = {
+    id: ElementRelationKey;
+  }
+
   export type Project = {
     name: ElementId;
     elements: LiveMap<ElementId, LiveObject<Element>>;
+    elementRelations: LiveMap<ElementRelationKey, LiveObject<ElementRelation>>;
   }
 }
