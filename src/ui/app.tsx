@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useState } from "react"
 import stringify from "json-stringify-pretty-compact";
 import { ProjectStore } from "../project";
 import { Element } from "../elements/element";
 import { ElementId } from "../fileFormat";
-import { ElementSelection, getAppState, getEditor, getSelectedElements, useAppState, useSelectionProperty } from "../global";
+import { ElementSelection, getAppState, getEditor, getSelectedElements, useAppState, useRelationsFrom, useSelectionProperty } from "../global";
+import { ElementRelations } from "../elementRelations";
 
 type ElementRow = {
   id: ElementId,
@@ -16,9 +17,10 @@ type ElementRow = {
 type StoreSnapshot = {
   stringified: string,
   flatElements: ElementRow[],
+  relations: string[],
 }
 
-function computeSnapshot(project: ProjectStore): StoreSnapshot {
+function computeSnapshot(project: ProjectStore, relationsStore: ElementRelations): StoreSnapshot {
   const flatElements: ElementRow[] = [];
 
   const traverse = (element: Element, indent: number) => {
@@ -36,9 +38,12 @@ function computeSnapshot(project: ProjectStore): StoreSnapshot {
 
   traverse(project.getRootLevel(), 0);
 
+  const relations: string[] = relationsStore.getObjects().map((x) => x.id);
+
   return {
     stringified: stringify(project.debugObjects(), { maxLength: 80 }),
     flatElements,
+    relations,
   }
 }
 
@@ -72,8 +77,8 @@ function ElementRow({ element, index }: ElementRowProps) {
   }
 
   const onClickVisibility = (e: React.MouseEvent) => {
-    getEditor().store.makeChanges(() => {
-      const el = getEditor().store.getById(element.id);
+    getEditor().makeChanges(() => {
+      const el = getEditor().project.getById(element.id);
       if (el) {
         el.hidden = !element.hidden;
       }
@@ -83,16 +88,16 @@ function ElementRow({ element, index }: ElementRowProps) {
   }
 
   const onClickDelete = (e: React.MouseEvent) => {
-    getEditor().store.makeChanges(() => {
-      getEditor().store.getById(element.id)?.delete();
+    getEditor().makeChanges(() => {
+      getEditor().project.getById(element.id)?.delete();
     });
     getEditor().undoTracker.commit();
     e.stopPropagation();
   }
 
   const onClickUp = (e: React.MouseEvent) => {
-    getEditor().store.makeChanges(() => {
-      const el = getEditor().store.getById(element.id);
+    getEditor().makeChanges(() => {
+      const el = getEditor().project.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() - 1);
       }
@@ -102,8 +107,8 @@ function ElementRow({ element, index }: ElementRowProps) {
   }
 
   const onClickDown = (e: React.MouseEvent) => {
-    getEditor().store.makeChanges(() => {
-      const el = getEditor().store.getById(element.id);
+    getEditor().makeChanges(() => {
+      const el = getEditor().project.getById(element.id);
       if (el) {
         el.moveToParentAtIndex(el.parent!, el.indexInParent() + 1);
       }
@@ -150,6 +155,35 @@ function ElementTree({ elements }: ElementTreeProps) {
       />
     ))}
   </div>
+}
+
+type RelationsMapProps = {
+  snapshot: StoreSnapshot,
+  selectedElementId: ElementId,
+}
+
+function RelationsMap({ snapshot, selectedElementId }: RelationsMapProps) {
+  const [relations, setRelation] = useRelationsFrom(selectedElementId);
+  return <div style={{ fontFamily: "monospace", display: "flex", flexDirection: "column" }}>
+    {snapshot.flatElements.map((element) => {
+      if (element.type === "level" || element.id === selectedElementId)  {
+        return;
+      }
+      return (
+        <label key={element.id}>
+          <input
+            type="checkbox"
+            checked={!!relations[element.id]}
+            onChange={(e) => {
+              setRelation(selectedElementId, element.id, e.target.checked);
+              getEditor().undoTracker.commit();
+            }}
+          />
+          {element.id}
+        </label>
+      )
+    })}
+  </div>;
 }
 
 function ColorInput() {
@@ -202,10 +236,17 @@ export function App() {
   const [liveblocksPaused, setLiveblocksPaused] = useState(false);
   const [snapshot, setSnapshot] = useState<StoreSnapshot | null>(null);
   useEffect(() => {
-    setSnapshot(computeSnapshot(editor.store));
-    return editor.store.subscribeObjectChange(() => {
-      setSnapshot(computeSnapshot(editor.store));
-    })
+    setSnapshot(computeSnapshot(editor.project, editor.relations));
+    const unsub1 = editor.project.subscribeObjectChange(() => {
+      setSnapshot(computeSnapshot(editor.project, editor.relations));
+    });
+    const unsub2 = editor.relations.subscribeObjectChange(() => {
+      setSnapshot(computeSnapshot(editor.project, editor.relations));
+    });
+    return () => {
+      unsub1();
+      unsub2();
+    };
   }, [editor]);
 
   const selection = useAppState((state) => state.selection);
@@ -213,10 +254,11 @@ export function App() {
   const canExtrude = selected.length === 1 && selected[0]?.type === "sketch";
   const canGroup = selected.length >= 1;
   const canUngroup = selected.length === 1 && selected[0]?.type === "group";
+  const singleSelected = selected.length === 1 ? selected[0] : null;;
 
   const onCreateSketch = () => {
-    editor.store.makeChanges(() => {
-      const sketch = getEditor().store.createSketch();
+    getEditor().makeChanges(() => {
+      const sketch = getEditor().project.createSketch();
       useAppState.setState({ selection: { [sketch.id]: true } });
     });
     getEditor().undoTracker.commit();
@@ -225,10 +267,10 @@ export function App() {
   const onCreateExtrusion = useCallback(() => {
     const element = selected[0];
     if (element?.type === "sketch") {
-      getEditor().store.makeChanges(() => {
+      getEditor().makeChanges(() => {
         const parent = element.parent!;
         const index = element.indexInParent();
-        const extrusion = getEditor().store.createExtrusion(element);
+        const extrusion = getEditor().project.createExtrusion(element);
         extrusion.moveToParentAtIndex(parent, index);
         useAppState.setState({ selection: { [extrusion.id]: true } });
       });
@@ -237,8 +279,8 @@ export function App() {
   }, [selected])
 
   const onGroup = useCallback(() => {
-    getEditor().store.makeChanges(() => {
-      const group = getEditor().store.createGroup();
+    getEditor().makeChanges(() => {
+      const group = getEditor().project.createGroup();
       // TODO: Should determine the parent of the group via least common ancestor.
       group.setParent(selected[0].parent!);
       for (const element of selected) {
@@ -252,7 +294,7 @@ export function App() {
   const onUngroup = useCallback(() => {
     const element = selected[0];
     if (element?.type === "group") {
-      getEditor().store.makeChanges(() => {
+      getEditor().makeChanges(() => {
         const selection: ElementSelection = {};
         const parent = element.parent;
         if (parent) {
@@ -296,6 +338,8 @@ export function App() {
         </div>
         <ColorInput />
         <textarea value={snapshot.stringified} style={{ width: 500, height: 500 }} readOnly />
+        <textarea value={snapshot.relations.join("\n")} style={{ width: 500, height: 200 }} readOnly />
+        {singleSelected ? <RelationsMap snapshot={snapshot} selectedElementId={singleSelected.id} /> : null}
       </div>
     </div>
   );

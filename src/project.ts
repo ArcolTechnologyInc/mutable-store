@@ -1,24 +1,61 @@
 import { LiveObject, Room } from "@liveblocks/client";
 import { ElementId, FileFormat } from "./fileFormat";
 import { Sketch } from "./elements/sketch";
-import { ArcolObjectStore, ObjectListener, ObjectObserver } from "./arcolObjectStore";
+import { ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectListener, ObjectObserver, StoreName } from "./arcolObjectStore";
 import { Extrusion } from "./elements/extrusion";
 import { Group } from "./elements/group";
 import { Level } from "./elements/level";
 import { Element } from "./elements/element";
 import { generateKeyBetween } from "fractional-indexing";
+import { HierarchyObserver } from "./hierarchyMixin";
+import { ChangeManager } from "./changeManager";
 
 export type ElementListener = ObjectListener<Element>;
 export type ElementObserver = ObjectObserver<Element>;
 
+class DeleteEmptyExtrusionObserver implements ElementObserver {
+  private elementsToCheck = new Set<ElementId>();
+
+  constructor(private store: ProjectStore) {}
+
+  public onChange(obj: Element, _origin: ChangeOrigin, change: ObjectChange) {
+    if (obj.type === "sketch") {
+      if (obj.parent?.type === "extrusion" && change.type === "delete") {
+        this.elementsToCheck.add(obj.parent.id);
+      }
+      if (change.type === "update" && change.property === "parentId") {
+        const oldParent = this.store.getById(change.oldValue);
+        if (oldParent?.type === "extrusion") {
+          this.elementsToCheck.add(oldParent.id);
+        }
+      }
+    }
+  }
+
+  public runDeferredWork() {
+    for (const id of this.elementsToCheck) {
+      const element = this.store.getById(id);
+      if (element?.type === "extrusion" && element.children.length === 0) {
+        this.store.removeObject(element)
+      }
+    }
+    this.elementsToCheck.clear();
+  }
+}
+
 export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
   private root: Level | null = null;
 
+  private observers: ElementObserver[];
+
   constructor(
     room: Room,
-    liveblocksRoot: LiveObject<FileFormat.Project>
+    liveblocksRoot: LiveObject<FileFormat.Project>,
+    changeManager: ChangeManager,
+    relationsObservers: ObjectObserver<Element>[],
+    undoTrackerObserver: ElementObserver,
   ) {
-    super(room, liveblocksRoot.get("elements"));
+    super(room, liveblocksRoot.get("elements"), changeManager);
 
     this.initialize();
 
@@ -32,10 +69,35 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
     if (!this.root) {
       throw new Error("Document without root level.")
     }
+
+    this.observers = [
+      new HierarchyObserver(this),
+      ...relationsObservers,
+      undoTrackerObserver,
+      new DeleteEmptyExtrusionObserver(this),
+    ];
+
+    this.subscribeObjectChange((obj, origin, change) => {
+      for (const observer of this.observers) {
+        observer.onChange(obj, origin, change);
+      }
+    });
+  }
+
+  get name() {
+    return "elements-store" as StoreName;
   }
 
   public getRootLevel() {
     return this.root!;
+  }
+
+  public runDeferredWork() {
+    this.changeManager.makeChanges(() => {
+      for (const observer of this.observers) {
+        observer.runDeferredWork?.();
+      }
+    });
   }
 
   public removeElement(element: Element) {

@@ -8,6 +8,7 @@ import { App } from "./src/ui/app";
 import { generateKeyBetween } from "fractional-indexing";
 import { useAppState } from "./src/global";
 import { Editor } from "./src/editor";
+import { ElementRelations } from "./src/elementRelations";
 
 async function init() {
   const client = createClient({
@@ -33,14 +34,14 @@ async function init() {
           parentIndex: generateKeyBetween(null, null),
         } satisfies FileFormat.Level)],
       ]),
+      elementRelations: new LiveMap(),
     }
   });
   const { root } = await room.getStorage();
 
   console.log(`Entered.`);
 
-  const store = new ProjectStore(room, root as any);
-  const editor = new Editor(store);
+  const editor = new Editor(room, root as any);
 
   const onFrame = () => {
     editor.onFrame();

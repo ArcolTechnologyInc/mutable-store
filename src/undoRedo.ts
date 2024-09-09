@@ -1,4 +1,4 @@
-import { ArcolObject, ArcolObjectFields, ArcolObjectStore, ChangeOrigin, ObjectChange } from "./arcolObjectStore";
+import { ArcolObject, ArcolObjectFields, ArcolObjectStore, ChangeOrigin, ObjectChange, StoreName } from "./arcolObjectStore";
 import { Editor } from "./editor";
 import { ElementSelection, useAppState } from "./global";
 
@@ -10,9 +10,14 @@ type CreateChange = { op: "create", properties: ArcolObjectFields<any> };
 type DeleteChange = { op: "delete", properties: ArcolObjectFields<any> };
 type UpdateChange = { op: "update", properties: Partial<ArcolObjectFields<any>> };
 
+type ChangesById = Record<string, CreateChange | DeleteChange | UpdateChange>;
+
 type HistoryEntry = {
-  store: AnyObjectStore | null,
-  changes: Record<string, CreateChange | DeleteChange | UpdateChange>,
+  changesByStore: Record<StoreName, {
+    store: AnyObjectStore,
+    changes: ChangesById,
+  }>,
+
   // Null means no selection change. Empty selection is an empty object.
   selection: ElementSelection | null;
 
@@ -45,17 +50,19 @@ function sortChanges(changes: Record<string, CreateChange | DeleteChange | Updat
 
 // Apply the changes in the entry to the store and return the reverse operation.
 function applyChanges(entry: HistoryEntry): HistoryEntry {
-  const store = entry.store;
   let reverseEntry: HistoryEntry = {
-    store,
-    changes: {},
+    changesByStore: {},
     selection: null,
     // It doesn't actually matter what this value is here.
     redoStackWasEmpty: true,
   };
 
-  store?.makeChanges(() => {
-    const { createChanges, deleteChanges, updateChanges } = sortChanges(entry.changes);
+  for (const key of Object.keys(entry.changesByStore)) {
+    const { store, changes } = entry.changesByStore[key as StoreName];
+
+    const { createChanges, deleteChanges, updateChanges } = sortChanges(changes);
+
+    const reverseEntryChanges: ChangesById = {};
 
     const objectsToAdd = [];
     for (const id in deleteChanges) {
@@ -69,7 +76,7 @@ function applyChanges(entry: HistoryEntry): HistoryEntry {
 
       const recreated = store.objectFromFields(deleteChanges[id].properties);
       objectsToAdd.push(recreated);
-      reverseEntry.changes[id] = { op: "create", properties: deleteChanges[id].properties };
+      reverseEntryChanges[id] = { op: "create", properties: deleteChanges[id].properties };
     }
 
     store.addObjects(objectsToAdd);
@@ -81,13 +88,13 @@ function applyChanges(entry: HistoryEntry): HistoryEntry {
         continue;
       }
 
-      reverseEntry.changes[id] = { op: "update" as const, properties: {} };
+      reverseEntryChanges[id] = { op: "update" as const, properties: {} };
       for (const key in updateChanges[id].properties) {
         const currentValue = obj.get(key);
         obj.set(key, updateChanges[id].properties[key]);
         // We're placing the current values of the properties in the redo entry, in case they
         // have changed since the creation.
-        reverseEntry.changes[id].properties[key] = currentValue;
+        reverseEntryChanges[id].properties[key] = currentValue;
       }
     }
 
@@ -102,9 +109,11 @@ function applyChanges(entry: HistoryEntry): HistoryEntry {
       store.removeObject(obj);
       // We're placing the current values of the object in the redo entry, in case they have
       // changed since the creation.
-      reverseEntry.changes[id] = { op: "delete", properties };
+      reverseEntryChanges[id] = { op: "delete", properties };
     }
-  });
+
+    reverseEntry.changesByStore[key as StoreName] = { store, changes: reverseEntryChanges };
+  }
 
   if (entry.selection) {
     const currentSelection = useAppState.getState().selection;
@@ -126,7 +135,7 @@ function applyChanges(entry: HistoryEntry): HistoryEntry {
  * selection change entries at that point in history.
  */
 function isIgnorableSelectionChangeEntry(entry: HistoryEntry) {
-  return !entry.redoStackWasEmpty && entry.selection != null && Object.keys(entry.changes).length === 0;
+  return !entry.redoStackWasEmpty && entry.selection != null && Object.keys(entry.changesByStore).length === 0;
 }
 
 /**
@@ -179,7 +188,9 @@ export class UndoHistory {
     // Changes to the document made via undo should not trigger the listener that places changes
     // in the undo stack.
     this.ignoreUndoRedoScope(() => {
-      const redoEntry = applyChanges(entry);
+      const redoEntry = this.editor.makeChanges(() => {
+        return applyChanges(entry);
+      });
 
       if (!isIgnorableSelectionChangeEntry(entry)) {
         this.redoStack.push(redoEntry);
@@ -208,7 +219,9 @@ export class UndoHistory {
     // Changes to the document made via redo should not trigger the listener that places changes
     // in the undo stack.
     this.ignoreUndoRedoScope(() => {
-      const undoEntry = applyChanges(entry);
+      const undoEntry = this.editor.makeChanges(() => {
+        return applyChanges(entry);
+      });
       this.undoStack.push(undoEntry);
     });
   }
@@ -224,21 +237,16 @@ export class UndoHistory {
       return;
     }
 
-    if (this.pendingChanges) {
-      if (this.pendingChanges.store == null) {
-        this.pendingChanges.store = store;
-      } else if (this.pendingChanges.store !== store) {
-        // Don't mix changes from different stores in the same history entry.
-        this.commit();
-        this.pendingChanges = { store, changes: {}, selection: null, redoStackWasEmpty: true };
-      }
-    } else {
-      this.pendingChanges = { store, changes: {}, selection: null, redoStackWasEmpty: true };
+    if (!this.pendingChanges) {
+      this.pendingChanges = { changesByStore: {}, selection: null, redoStackWasEmpty: true };
+    }
+    if (!this.pendingChanges.changesByStore[store.name]) {
+      this.pendingChanges.changesByStore[store.name] = { store, changes: {} };
     }
 
     this.redoStack.length = 0;
 
-    const changes = this.pendingChanges.changes;
+    const changes = this.pendingChanges.changesByStore[store.name].changes;
     if (change.type === "update") {
       if (!changes[obj.id]) {
         changes[obj.id] = { op: "update", properties: {} };
@@ -256,8 +264,7 @@ export class UndoHistory {
 
     if (!this.pendingChanges) {
       this.pendingChanges = {
-        store: null,
-        changes: {},
+        changesByStore: {},
         selection: previousSelection,
         redoStackWasEmpty: this.redoStack.length === 0
       };

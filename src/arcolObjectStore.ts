@@ -1,7 +1,8 @@
 import { LiveMap, LiveObject, Room, StorageUpdate } from "@liveblocks/client";
-import { FileFormat } from "./fileFormat";
+import { Brand, FileFormat } from "./fileFormat";
 import { generateKeyBetween } from "fractional-indexing";
 import { deepEqual } from "./lib/deepEqual";
+import { ChangeManager } from "./changeManager";
 
 export type ArcolObjectFields<I extends string> = FileFormat.ObjectShared<I> & { [key: string]: any };
 
@@ -168,7 +169,7 @@ export class ArcolObject<
   }
 
   public set(key: string, value: any) {
-    if (!this.store.makingChanges()) {
+    if (!this.store.changeManager.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
@@ -197,6 +198,8 @@ export class ArcolObject<
   }
 }
 
+export type StoreName = Brand<string, "store-name">;
+
 /**
  * We have a general `ArcolObjectStore` class that can be instantiated because in Arcol, we have at
  * least two types of objects: Elements and board layers.
@@ -210,7 +213,6 @@ export class ArcolObject<
 export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
   protected objects = new Map<I, T>;
   protected listeners = new Set<ObjectListener<T>>();
-  private makeChangesRefCount = 0;
 
   constructor(
     private room: Room,
@@ -218,10 +220,13 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
      * The container node for all the objects.
      */
     private rootNode: LiveMap<string, LiveObject<any>>,
+    public changeManager: ChangeManager,
   ) {
   }
 
-  public initialize() {
+  abstract get name(): StoreName;
+
+  protected initialize() {
     // Populate objects from the initial state.
     for (const [id, node] of this.rootNode) {
       const object = this.objectFromLiveObject(node);
@@ -233,7 +238,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     }
 
     this.room.subscribe(this.rootNode, (nodesUpdates) => {
-      if (!this.makingChanges()) {
+      if (!this.changeManager.makingChanges()) {
         this.onRemoteChanges(nodesUpdates)
       }
     }, { isDeep: true });
@@ -259,7 +264,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
   }
 
   public addObjects(objects: T[]) {
-    if (!this.makingChanges()) {
+    if (!this.changeManager.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
     }
@@ -284,31 +289,6 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     this.notifyListeners(object, "local", "delete");
   }
 
-  /**
-   * Any local mutation to objects in the store must be wrapped in a `makeChanges()` call. This
-   * ensures batching, but also allows us to distinguish between local and remote changes.
-   */
-  public makeChanges<T>(cb: () => T): T {
-    this.makeChangesRefCount++;
-    if (this.makeChangesRefCount > 1) {
-      return cb();
-    }
-
-    const ret = this.room.batch(() => {
-      return cb();
-    })
-
-    // Don't let changes accumulate in LiveBlock's history -- we're managing our own undo/redo.
-    this.room.history.clear();
-
-    this.makeChangesRefCount--;
-    return ret;
-  }
-
-  public makingChanges(): boolean {
-    return this.makeChangesRefCount > 0;
-  }
-
   public debugObjects() {
     return this.getObjects().map((obj) => obj.toDebugObj());
   }
@@ -324,7 +304,6 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     // That's why we iterate over fields and set them individually instead.
     const node = new LiveObject(fields);
     node.set("id", fields.id);
-    node.set("type", fields.type);
     const object = this.objectFromLiveObject(node);
     for (const field in fields) {
       object.set(field, fields[field]);
@@ -348,17 +327,24 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
       // Check for new objects being added or deleted.
       if (nodeUpdate.type === "LiveMap" && nodeUpdate.node === this.rootNode) {
         for (const key in nodeUpdate.updates) {
+          const update = nodeUpdate.updates[key];
           const object = this.getById(key as I);
-          if (object && nodeUpdate.updates[key].type === "delete") {
+
+          // LiveMap updates are either "delete" or "update".
+          if (update.type === "delete") {
+            if (!object) {
+              console.error("Error receiving update: object deleted that doesn't exist.");
+              continue;
+            }
             this.objects.delete(key as I);
             this.notifyListeners(object, "remote", "delete");
           } else if (object) {
             console.error("Error receiving update: object changed for the same key.");
           } else {
-            const object = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
-            if (key === object.id) {
-              this.objects.set(key as I, object);
-              this.notifyListeners(object, "remote", "create");
+            const newObject = this.objectFromLiveObject(nodeUpdate.node.get(key) as LiveObject<any>);
+            if (key === newObject.id) {
+              this.objects.set(key as I, newObject);
+              this.notifyListeners(newObject, "remote", "create");
             } else {
               console.error("Error receiving update: object key does not match object id.");
             }
