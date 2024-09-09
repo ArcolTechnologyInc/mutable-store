@@ -56,7 +56,7 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
       return;
     }
 
-    const first = selectedElements[0].get(propertyName);
+    const first = selectedElements[0].getAny(propertyName);
     for (let i = 1; i < selectedElements.length; i++) {
       const element = selectedElements[i];
       if (!(propertyName in element)) {
@@ -91,7 +91,7 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
       const selectedElements = getSelectedElements(selection);
       for (const element of selectedElements) {
         if (propertyName in element) {
-          element.set(propertyName, value);
+          element.setAny(propertyName, value);
         }
       }
     });

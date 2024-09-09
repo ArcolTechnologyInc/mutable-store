@@ -28,7 +28,7 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
   }
 
   set height(value: FileFormat.Extrusion["height"]) {
-    this.set("height", value);
+    this.setAny("height", value);
   }
 }
 

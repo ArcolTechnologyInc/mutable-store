@@ -75,8 +75,8 @@ export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & Hier
   }
 
   public setParent(parent: T) {
-    this.self.set("parentId", parent.id);
-    this.self.set("parentIndex", generateKeyBetween(parent.lastChild()?.parentIndex, null));
+    this.self.setAny("parentId", parent.id);
+    this.self.setAny("parentIndex", generateKeyBetween(parent.lastChild()?.parentIndex, null));
   }
 
   /**
@@ -88,16 +88,16 @@ export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & Hier
       return;
     }
 
-    this.self.set("parentId", parent.id);
+    this.self.setAny("parentId", parent.id);
     const clampedIndex = Math.min(index, parent.children.length);
 
     if (clampedIndex > currentIndex) {
-      this.self.set("parentIndex", generateKeyBetween(
+      this.self.setAny("parentIndex", generateKeyBetween(
         parent.children[clampedIndex]?.parentIndex,
         parent.children[clampedIndex + 1]?.parentIndex)
       );
     } else {
-      this.self.set("parentIndex", generateKeyBetween(
+      this.self.setAny("parentIndex", generateKeyBetween(
         parent.children[clampedIndex - 1]?.parentIndex,
         parent.children[clampedIndex]?.parentIndex)
       );

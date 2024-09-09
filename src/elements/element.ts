@@ -19,6 +19,6 @@ export class HideableMixin {
   }
 
   set hidden(value: Hideable["hidden"]) {
-    (this as unknown as ArcolObject<ElementId, Element>).set("hidden", value);
+    (this as unknown as ArcolObject<ElementId, Element>).setAny("hidden", value);
   }
 };

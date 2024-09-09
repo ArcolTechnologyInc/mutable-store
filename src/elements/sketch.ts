@@ -28,7 +28,7 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   }
 
   set translate(value: FileFormat.Sketch["translate"]) {
-    this.set("translate", value);
+    this.setAny("translate", value);
   }
 
   get color(): FileFormat.Sketch["color"] {
@@ -36,7 +36,7 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   }
 
   set color(value: FileFormat.Sketch["color"]) {
-    this.set("color", value);
+    this.setAny("color", value);
   }
 }
 

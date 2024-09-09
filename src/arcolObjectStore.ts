@@ -164,11 +164,11 @@ export class ArcolObject<
     return { ...this.fields };
   }
 
-  public get(key: string): any {
+  public getAny(key: string): any {
     return this.fields[key];
   }
 
-  public set(key: string, value: any) {
+  public setAny(key: string, value: any) {
     if (!this.store.changeManager.makingChanges()) {
       console.warn("All mutations to Arcol objects must be wrapped in a makeChanges call.")
       return;
@@ -306,7 +306,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     node.set("id", fields.id);
     const object = this.objectFromLiveObject(node);
     for (const field in fields) {
-      object.set(field, fields[field]);
+      object.setAny(field, fields[field]);
     }
     return object;
   }
@@ -364,7 +364,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
       const object = this.getById(id);
       if (object) {
         for (const key in nodeUpdate.updates) {
-          const oldValue = object.get(key);
+          const oldValue = object.getAny(key);
           const newValue = nodeUpdate.node.get(key);
 
           if (deepEqual(oldValue, newValue)) {
