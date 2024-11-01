@@ -3,7 +3,7 @@ import { Editor } from "./editor";
 import { ElementSelection, useAppState } from "./global";
 
 type AnyObject = ArcolObject<any, any>;
-type AnyObjectStore = ArcolObjectStore<any, any>;
+type AnyObjectStore = ArcolObjectStore<any, AnyObject>;
 
 // When "op" is "create" or "delete", properties includes all of the object.
 type CreateChange = { op: "create", properties: ArcolObjectFields<any> };
@@ -90,8 +90,8 @@ function applyChanges(entry: HistoryEntry): HistoryEntry {
 
       reverseEntryChanges[id] = { op: "update" as const, properties: {} };
       for (const key in updateChanges[id].properties) {
-        const currentValue = obj.get(key);
-        obj.set(key, updateChanges[id].properties[key]);
+        const currentValue = obj.getAny(key);
+        obj.setAny(key, updateChanges[id].properties[key]);
         // We're placing the current values of the properties in the redo entry, in case they
         // have changed since the creation.
         reverseEntryChanges[id].properties[key] = currentValue;

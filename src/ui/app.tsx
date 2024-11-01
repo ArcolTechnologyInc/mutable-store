@@ -272,6 +272,7 @@ export function App() {
         const index = element.indexInParent();
         const extrusion = getEditor().project.createExtrusion(element);
         extrusion.moveToParentAtIndex(parent, index);
+        element.setParent(extrusion);
         useAppState.setState({ selection: { [extrusion.id]: true } });
       });
       getEditor().undoTracker.commit();
