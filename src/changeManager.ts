@@ -21,9 +21,14 @@ export class ChangeManager {
       return cb();
     }
 
-    const ret = this.room.batch(() => {
-      return cb();
-    })
+    let ret: T;
+    if (this.makeChangesRefCount > 1) {
+      ret = cb();
+    } else {
+      ret = this.room.batch(() => {
+        return cb();
+      });
+    }
 
     // Don't let changes accumulate in LiveBlock's history -- we're managing our own undo/redo.
     this.room.history.clear();
