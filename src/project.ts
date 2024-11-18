@@ -1,7 +1,7 @@
 import { LiveObject, Room } from "@liveblocks/client";
 import { ElementId, FileFormat } from "./fileFormat";
 import { Sketch } from "./elements/sketch";
-import { ArcolObjectStore, ObjectChange, ObjectListener, ObjectObserver, StoreName } from "./arcolObjectStore";
+import { ArcolObjectFields, ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectObserver, StoreName } from "./arcolObjectStore";
 import { Extrusion } from "./elements/extrusion";
 import { Group } from "./elements/group";
 import { Level } from "./elements/level";
@@ -10,8 +10,69 @@ import { generateKeyBetween } from "fractional-indexing";
 import { HierarchyObserver } from "./hierarchyMixin";
 import { ChangeManager } from "./changeManager";
 
-export type ElementListener = ObjectListener<Element>;
 export type ElementObserver = ObjectObserver<Element>;
+
+/**
+ * A more strongly typed version of {@link ObjectChange}.
+ *
+ * It uses mapped types and index access types to produce a union of all the possible changes for
+ * a given object type.
+ *
+ * e.g.
+ *   TypedObjectChange<{ k1: V1, k2: V2, ... }> =
+ *     | { type: "create" | "delete" }
+ *     | { type: "update", property: "k1", oldValue: V1 }
+ *     | { type: "update", property: "k2", oldValue: V2 }
+ *     ...
+ */
+type TypedObjectChange<T extends ArcolObjectFields> =
+  | { type: "create" | "delete" }
+  | { [K in keyof T]: { type: "update", property: K, oldValue: T[K] } }[keyof T]
+
+/**
+ * A more strongly typed version of {@link ObjectListener} for `Element`. The argument to the
+ * callback is a single `params` object which repeats the `type` from `obj.type`. This allows
+ * narrowing both `obj` and `change` based on the `type` of the `Element`.
+ *
+ * In more concrete terms, it allows the following to give the desired types:
+ * ```
+ *   if (params.type === "someElementType") {
+ *     if (params.change.type === "update") {
+ *       // params.change.property is a union of the possible fields of `someElementType`
+ *       if (params.change.property) {
+ *         // params.change.value is the type of the field [params.change.property] in `someElementType`
+ *       }
+ *     }
+ *   }
+ * ```
+ *
+ * The weird `T extends any` syntax is called "Distributive Conditional Types" and allows writing
+ * generic that maps a union type to a different union of types.
+ * https://www.typescriptlang.org/docs/handbook/2/conditional-types.html#distributive-conditional-types
+ */
+type ElementListener<T extends Element = Element> = (params: T extends any ? {
+  type: T["type"],
+  obj: T,
+  change: TypedObjectChange<ReturnType<T["getFields"]>>,
+  origin: ChangeOrigin,
+} : never) => void
+
+// This is just here as a test that our TypeScript types are able to perform the desired narrowing.
+function foo(l: ElementListener) {}
+foo((params) => {
+    if (params.type === "sketch") {
+        const obj: Sketch = params.obj;
+        if (params.change.type === "update") {
+          const property: "id" | "type" | "parentId" | "parentIndex" | "translate" | "color" = params.change.property;
+          if (params.change.property === "translate") {
+            const old: FileFormat.Vec3 = params.change.oldValue
+            void old;
+          }
+          void property;
+        }
+    }
+})
+
 
 class DeleteEmptyExtrusionObserver implements ElementObserver {
   private elementsToCheck = new Set<ElementId>();
@@ -97,6 +158,12 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
       for (const observer of this.observers) {
         observer.runDeferredWork?.();
       }
+    });
+  }
+
+  public subscribeElementChange(listener: ElementListener): () => void {
+    return this.subscribeObjectChange((obj, change, origin) => {
+      listener({ type: obj.type, obj, change, origin } as any);
     });
   }
 

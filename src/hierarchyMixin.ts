@@ -10,7 +10,7 @@ import { FileFormat } from "./fileFormat";
  * - Implement HierarchyObserver to updated the cached values. It should probably be the first
  *   observer to run considering that subsequent observers are likely to read the children list.
  */
-export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & HierarchyMixin<I, T>> {
+export class HierarchyMixin<I extends string, T extends ArcolObject<I, any, T> & HierarchyMixin<I, T>> {
   static MixinLocalFieldsWithDefaults = {};
 
   /**
@@ -113,7 +113,7 @@ export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & Hier
    * We could make this a symbol private to this field to enforce it more strongly, but I think it's
    * not worth the readability hit.
    */
-  public _internalAddChild(child: ArcolObject<I, T>) {
+  public _internalAddChild(child: ArcolObject<I, any, T>) {
     this.childrenSet.add(child.id);
     this.cachedChildren = null;
   }
@@ -121,7 +121,7 @@ export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & Hier
   /**
    * To be called from `ArcolObjectStore` only.
    */
-  public _internalRemoveChild(child: ArcolObject<I, T>) {
+  public _internalRemoveChild(child: ArcolObject<I, any, T>) {
     this.childrenSet.delete(child.id);
     this.cachedChildren = null;
   }
@@ -139,7 +139,7 @@ export class HierarchyMixin<I extends string, T extends ArcolObject<I, T> & Hier
  */
 export class HierarchyObserver<
     I extends string,
-    T extends ArcolObject<I, T> & HierarchyMixin<I, T>
+    T extends ArcolObject<I, any, T> & HierarchyMixin<I, T>
 > implements ObjectObserver<T> {
 
   constructor(private store: ArcolObjectStore<I, T>) { }

@@ -5,7 +5,7 @@ import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 import { ArcolObject, applyArcolObjectMixins } from "../arcolObjectStore";
 
-export class Sketch extends ArcolObject<ElementId, Element> {
+export class Sketch extends ArcolObject<ElementId, FileFormat.Sketch, Element> {
   static LocalFieldsWithDefaults = {
     ...HideableMixin.LocalFieldsWithDefaults,
   };
@@ -28,7 +28,7 @@ export class Sketch extends ArcolObject<ElementId, Element> {
   }
 
   set translate(value: FileFormat.Sketch["translate"]) {
-    this.setAny("translate", value);
+    this.set("translate", value);
   }
 
   get color(): FileFormat.Sketch["color"] {
