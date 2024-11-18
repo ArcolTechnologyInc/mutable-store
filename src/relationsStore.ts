@@ -19,7 +19,7 @@ export class Relation<
 
   constructor(
     store: RelationsStore<IA, IB, O>,
-    node: LiveObject<FileFormat.ObjectShared<string>>
+    node: LiveObject<FileFormat.ObjectShared<`${IA}<>${IB}`>>
   ) {
     super(store, node, {});
     const parts = this.id.split("<>");

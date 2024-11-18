@@ -29,7 +29,7 @@ export class ElementRelations extends RelationsStore<ElementId, ElementId, Eleme
   }
 
   public addElementRelation(elementA: Element, elementB: Element) {
-    const key = `${elementA.id}<>${elementB.id}`;
+    const key = `${elementA.id}<>${elementB.id}` as const;
     const node = new LiveObject({ id: key });
     const relation = new ElementRelation(this, node);
     this.addObject(relation);

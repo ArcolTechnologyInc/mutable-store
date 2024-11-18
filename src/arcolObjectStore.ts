@@ -131,7 +131,7 @@ export class ArcolObject<
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
-    protected node: LiveObject<any>,
+    protected node: LiveObject<ArcolObjectFields<I>>,
     /**
      * List of fields that should not be persisted.
      */
