@@ -22,6 +22,10 @@ export class Group extends ArcolObject<ElementId, Element> {
   get type() {
     return "group" as const;
   }
+
+  public getFields(): FileFormat.Sketch  {
+    return this.fields as FileFormat.Sketch;
+  }
 }
 
 applyArcolObjectMixins(Group, [HierarchyMixin, HideableMixin]);

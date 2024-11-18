@@ -23,6 +23,10 @@ export class Sketch extends ArcolObject<ElementId, Element> {
     return "sketch" as const;
   }
 
+  public getFields(): FileFormat.Sketch  {
+    return this.fields as FileFormat.Sketch;
+  }
+
   get translate(): FileFormat.Sketch["translate"] {
     return this.fields.translate;
   }
