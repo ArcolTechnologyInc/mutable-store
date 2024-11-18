@@ -6,9 +6,9 @@ type AnyObject = ArcolObject<any, any>;
 type AnyObjectStore = ArcolObjectStore<any, any>;
 
 // When "op" is "create" or "delete", properties includes all of the object.
-type CreateChange = { op: "create", properties: ArcolObjectFields<any> };
-type DeleteChange = { op: "delete", properties: ArcolObjectFields<any> };
-type UpdateChange = { op: "update", properties: Partial<ArcolObjectFields<any>> };
+type CreateChange = { op: "create", properties: ArcolObjectFields };
+type DeleteChange = { op: "delete", properties: ArcolObjectFields };
+type UpdateChange = { op: "update", properties: Partial<ArcolObjectFields> };
 
 type ChangesById = Record<string, CreateChange | DeleteChange | UpdateChange>;
 
@@ -74,7 +74,7 @@ function applyChanges(entry: HistoryEntry): HistoryEntry {
         continue;
       }
 
-      const recreated = store.objectFromFields(deleteChanges[id].properties);
+      const recreated = store.objectFromFields(id, deleteChanges[id].properties);
       objectsToAdd.push(recreated);
       reverseEntryChanges[id] = { op: "create", properties: deleteChanges[id].properties };
     }

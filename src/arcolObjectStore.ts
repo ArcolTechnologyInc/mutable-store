@@ -1,10 +1,9 @@
 import { LiveMap, LiveObject, Room, StorageUpdate } from "@liveblocks/client";
 import { Brand, FileFormat } from "./fileFormat";
-import { generateKeyBetween } from "fractional-indexing";
 import { deepEqual } from "./lib/deepEqual";
 import { ChangeManager } from "./changeManager";
 
-export type ArcolObjectFields<I extends string> = FileFormat.ObjectShared<I> & { [key: string]: any };
+export type ArcolObjectFields = { [key: string]: any };
 
 /**
  * ---------------------------
@@ -126,26 +125,25 @@ export class ArcolObject<
    *
    * Setters should call `.set`, NOT mutate `fields` directly.
    */
-  protected fields: ArcolObjectFields<I>;
+  public readonly id: I;
+  protected fields: ArcolObjectFields;
   protected localFields: { [key: string]: true };
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
-    protected node: LiveObject<ArcolObjectFields<I>>,
+    protected node: LiveObject<FileFormat.ObjectShared<I> & ArcolObjectFields>,
     /**
      * List of fields that should not be persisted.
      */
     localFieldsWithDefaults: { [key: string]: unknown },
   ) {
-    this.fields = node.toObject();
+    const { id, ...fields } = node.toObject();
+    this.id = id;
+    this.fields = fields;
     this.localFields = {};
     for (const key in localFieldsWithDefaults) {
       this.localFields[key] = true;
     }
-  }
-
-  get id() {
-    return this.fields.id;
   }
 
   public getFields() {
@@ -299,11 +297,11 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
    */
   public abstract objectFromLiveObject(node: LiveObject<any>): T;
 
-  public objectFromFields(fields: ArcolObjectFields<I>): T {
+  public objectFromFields(id: I, fields: ArcolObjectFields): T {
     // We don't copy all the fields into the LiveObject because some of the fields are internal.
     // That's why we iterate over fields and set them individually instead.
     const node = new LiveObject(fields);
-    node.set("id", fields.id);
+    node.set("id", id);
     const object = this.objectFromLiveObject(node);
     for (const field in fields) {
       object.setAny(field, fields[field]);
