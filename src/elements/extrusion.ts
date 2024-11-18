@@ -23,6 +23,10 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
     return "extrusion" as const;
   }
 
+  public getFields(): FileFormat.Sketch  {
+    return this.fields as FileFormat.Sketch;
+  }
+
   get height(): FileFormat.Extrusion["height"] {
     return this.fields.height;
   }

@@ -22,6 +22,10 @@ export class Level extends ArcolObject<ElementId, Element> {
   get type() {
     return "level" as const;
   }
+
+  public getFields(): FileFormat.Sketch  {
+    return this.fields as FileFormat.Sketch;
+  }
 }
 
 applyArcolObjectMixins(Level, [HierarchyMixin, HideableMixin]);
