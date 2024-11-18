@@ -2,7 +2,7 @@ import { ArcolObject, ArcolObjectFields, ArcolObjectStore, ChangeOrigin, ObjectC
 import { Editor } from "./editor";
 import { ElementSelection, useAppState } from "./global";
 
-type AnyObject = ArcolObject<any, any>;
+type AnyObject = ArcolObject<any, any, any>;
 type AnyObjectStore = ArcolObjectStore<any, any>;
 
 // When "op" is "create" or "delete", properties includes all of the object.

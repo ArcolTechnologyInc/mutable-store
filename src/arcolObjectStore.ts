@@ -80,7 +80,7 @@ type GConstructor<T = {}> = new (...args: any[]) => T;
 // The fields defined in mixins could be local fields, and we need to aggregate the list of local fields.
 // That's why all mixins are required to declare their local fields in static properties so we can
 // aggregate them.
-type ArcolObjectBase<T extends object> = GConstructor<ArcolObject<any, any>> & {
+type ArcolObjectBase<T extends object> = GConstructor<ArcolObject<any, any, any>> & {
   LocalFieldsWithDefaults: T,
 };
 type MixinClass<T extends object> = GConstructor<any> & {
@@ -113,7 +113,8 @@ export function applyArcolObjectMixins<
  */
 export class ArcolObject<
   I extends string,
-  T extends ArcolObject<I, T>
+  S extends ArcolObjectFields,
+  T extends ArcolObject<I, any, T>
 > {
   /**
    * Stores the values of the fields of the object.
@@ -126,12 +127,12 @@ export class ArcolObject<
    * Setters should call `.set`, NOT mutate `fields` directly.
    */
   public readonly id: I;
-  protected fields: ArcolObjectFields;
+  protected fields: S;
   protected localFields: { [key: string]: true };
 
   constructor(
     protected store: ArcolObjectStore<I, T>,
-    protected node: LiveObject<FileFormat.ObjectShared<I> & ArcolObjectFields>,
+    protected node: LiveObject<FileFormat.ObjectShared<I> & S>,
     /**
      * List of fields that should not be persisted.
      */
@@ -139,7 +140,7 @@ export class ArcolObject<
   ) {
     const { id, ...fields } = node.toObject();
     this.id = id;
-    this.fields = fields;
+    this.fields = fields as unknown as S;
     this.localFields = {};
     for (const key in localFieldsWithDefaults) {
       this.localFields[key] = true;
@@ -162,6 +163,14 @@ export class ArcolObject<
     return { ...this.fields };
   }
 
+  public get<K extends keyof S>(key: K): S[K] {
+    return this.fields[key];
+  }
+
+  public set<K extends keyof S>(key: K, value: S[K]) {
+    return this.setAny(key as string, value);
+  }
+
   public getAny(key: string): any {
     return this.fields[key];
   }
@@ -177,7 +186,7 @@ export class ArcolObject<
     if (!(key in this.localFields)) {
       this.node.set(key, value);
     }
-    this.fields[key] = value;
+    this.fields[key as keyof S] = value;
     this.store._internalOnFieldSet(this as any, key as string, oldValue, value);
   }
 
@@ -185,7 +194,7 @@ export class ArcolObject<
    * To be called from `ArcolObjectStore` only.
    */
   public _internalUpdateField(key: string, value: any) {
-    this.fields[key] = value;
+    this.fields[key as keyof S] = value;
   }
 
   /**
@@ -208,7 +217,7 @@ export type StoreName = Brand<string, "store-name">;
  * <T> is the type of the objects that we are putting in the store, probably a discriminated union
  * of all the different subtypes of objects.
  */
-export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I, T>> {
+export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I, any, T>> {
   protected objects = new Map<I, T>;
   protected listeners = new Set<ObjectListener<T>>();
 

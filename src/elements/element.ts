@@ -7,7 +7,7 @@ import { Sketch } from "./sketch";
 
 export type Element = Sketch | Extrusion | Group | Level;
 
-interface Hideable {
+export interface Hideable {
   hidden: boolean;
 }
 
@@ -15,10 +15,10 @@ export class HideableMixin {
   static LocalFieldsWithDefaults = { hidden: false } satisfies Partial<Hideable>;
 
   get hidden(): Hideable["hidden"] {
-    return (this as unknown as ArcolObject<ElementId, Element>).getFields().hidden;
+    return (this as unknown as ArcolObject<ElementId, any, Element>).getFields().hidden;
   }
 
   set hidden(value: Hideable["hidden"]) {
-    (this as unknown as ArcolObject<ElementId, Element>).setAny("hidden", value);
+    (this as unknown as ArcolObject<ElementId, any, Element>).setAny("hidden", value);
   }
 };

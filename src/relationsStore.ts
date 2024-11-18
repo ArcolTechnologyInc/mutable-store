@@ -13,7 +13,7 @@ export class Relation<
   IA extends string,
   IB extends string,
   O extends Relation<IA, IB, O>
-> extends ArcolObject<`${IA}<>${IB}`, O> {
+> extends ArcolObject<`${IA}<>${IB}`, any, O> {
   public readonly keyA: IA;
   public readonly keyB: IB;
 
@@ -52,9 +52,9 @@ export abstract class RelationsStore<
 
   // The owner of this class should put these observers in the respective stores whose objects
   // are being related.
-  public readonly observerA: ObjectObserver<ArcolObject<IA, any>> =
+  public readonly observerA: ObjectObserver<ArcolObject<IA, any, any>> =
     { onChange: this.onObjectChangeA.bind(this) };
-  public readonly observerB: ObjectObserver<ArcolObject<IB, any>> =
+  public readonly observerB: ObjectObserver<ArcolObject<IB, any, any>> =
     { onChange: this.onObjectChangeB.bind(this) };
 
   protected initialize() {
@@ -120,7 +120,7 @@ export abstract class RelationsStore<
   /**
    * Cleans up relations related to an object instance of type A when it is deleted.
    */
-  private onObjectChangeA(obj: ArcolObject<IA, any>, change: ObjectChange) {
+  private onObjectChangeA(obj: ArcolObject<IA, any, any>, change: ObjectChange) {
     if (change.type === "delete") {
       const relations = this.relationsFromA.get(obj.id);
       if (relations) {
@@ -136,7 +136,7 @@ export abstract class RelationsStore<
   /**
    * Cleans up relations related to an object instance of type B when it is deleted.
    */
-  private onObjectChangeB(obj: ArcolObject<IB, any>, change: ObjectChange) {
+  private onObjectChangeB(obj: ArcolObject<IB, any, any>, change: ObjectChange) {
     if (change.type === "delete") {
       const relations = this.relationsFromB.get(obj.id);
       if (relations) {

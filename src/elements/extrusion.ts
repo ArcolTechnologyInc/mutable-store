@@ -5,7 +5,7 @@ import { ProjectStore } from "../project";
 import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 
-export class Extrusion extends ArcolObject<ElementId, Element> {
+export class Extrusion extends ArcolObject<ElementId, FileFormat.Extrusion, Element> {
   static LocalFieldsWithDefaults = {
     ...HideableMixin.LocalFieldsWithDefaults,
   };
@@ -28,7 +28,7 @@ export class Extrusion extends ArcolObject<ElementId, Element> {
   }
 
   set height(value: FileFormat.Extrusion["height"]) {
-    this.setAny("height", value);
+    this.set("height", value);
   }
 }
 

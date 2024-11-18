@@ -5,7 +5,7 @@ import { ProjectStore } from "../project";
 import { Element, HideableMixin } from "./element";
 import { HierarchyMixin } from "../hierarchyMixin";
 
-export class Level extends ArcolObject<ElementId, Element> {
+export class Level extends ArcolObject<ElementId, FileFormat.Level, Element> {
   static LocalFieldsWithDefaults = {
     ...HideableMixin.LocalFieldsWithDefaults,
   };
