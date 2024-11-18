@@ -17,13 +17,13 @@ export type ObjectChange =
   | { type: "create" | "delete" }
   | { type: "update", property: string, oldValue: any }
 
-export type ObjectListener<T> = (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
+export type ObjectListener<T> = (obj: T, change: ObjectChange, origin: ChangeOrigin) => void;
 
 /**
  * Similar to `ObjectListener`, but as an object and with an optional `runDeferredWork`.
  */
 export interface ObjectObserver<T> {
-  onChange: (obj: T, origin: ChangeOrigin, change: ObjectChange) => void;
+  onChange: (obj: T, change: ObjectChange, origin: ChangeOrigin) => void;
 
   /**
    * A sufficiently common pattern is to set a dirty flag in `onChange` and then do the work later.
@@ -386,7 +386,7 @@ export abstract class ArcolObjectStore<I extends string, T extends ArcolObject<I
     const change = { type, property, oldValue } as ObjectChange;
 
     for (const listener of this.listeners) {
-      listener(object, origin, change);
+      listener(object, change, origin);
     }
   }
 }

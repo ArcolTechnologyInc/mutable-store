@@ -1,5 +1,5 @@
 import { generateKeyBetween } from "fractional-indexing";
-import { ArcolObject, ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectObserver } from "./arcolObjectStore";
+import { ArcolObject, ArcolObjectStore, ObjectChange, ObjectObserver } from "./arcolObjectStore";
 import { FileFormat } from "./fileFormat";
 
 /**
@@ -144,7 +144,7 @@ export class HierarchyObserver<
 
   constructor(private store: ArcolObjectStore<I, T>) { }
 
-  public onChange(obj: T, _origin: ChangeOrigin, change: ObjectChange) {
+  public onChange(obj: T, change: ObjectChange) {
     if (change.type === "create") {
       obj.parent?._internalAddChild(obj);
     } else if (change.type === "delete") {

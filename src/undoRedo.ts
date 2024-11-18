@@ -232,7 +232,7 @@ export class UndoHistory {
     this.ignoreChangesCounter--;
   }
 
-  public onChange(store: AnyObjectStore, obj: AnyObject, origin: ChangeOrigin, change: ObjectChange) {
+  public onChange(store: AnyObjectStore, obj: AnyObject, change: ObjectChange, origin: ChangeOrigin) {
     if (this.ignoreChangesCounter > 0 || origin === "remote") {
       return;
     }

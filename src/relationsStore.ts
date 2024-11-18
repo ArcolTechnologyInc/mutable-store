@@ -1,5 +1,5 @@
 import { LiveObject } from "@liveblocks/client";
-import { ArcolObject, ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectObserver } from "./arcolObjectStore";
+import { ArcolObject, ArcolObjectStore, ObjectChange, ObjectObserver } from "./arcolObjectStore";
 import { FileFormat } from "./fileFormat";
 
 /**
@@ -71,7 +71,7 @@ export abstract class RelationsStore<
     // An alternative implementation could be to have abstract methods on `ArcolObjectStore` that
     // we override in this subclass, to _really_ ensure that we handle object changes here first
     // before other listeners.
-    this.subscribeObjectChange((obj, origin, change) => {
+    this.subscribeObjectChange((obj, change) => {
       if (change.type === "create") {
         this.addRelation(obj);
       } else if (change.type === "delete") {
@@ -120,7 +120,7 @@ export abstract class RelationsStore<
   /**
    * Cleans up relations related to an object instance of type A when it is deleted.
    */
-  private onObjectChangeA(obj: ArcolObject<IA, any>, _origin: ChangeOrigin, change: ObjectChange) {
+  private onObjectChangeA(obj: ArcolObject<IA, any>, change: ObjectChange) {
     if (change.type === "delete") {
       const relations = this.relationsFromA.get(obj.id);
       if (relations) {
@@ -136,7 +136,7 @@ export abstract class RelationsStore<
   /**
    * Cleans up relations related to an object instance of type B when it is deleted.
    */
-  private onObjectChangeB(obj: ArcolObject<IB, any>, _origin: ChangeOrigin, change: ObjectChange) {
+  private onObjectChangeB(obj: ArcolObject<IB, any>, change: ObjectChange) {
     if (change.type === "delete") {
       const relations = this.relationsFromB.get(obj.id);
       if (relations) {

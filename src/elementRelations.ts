@@ -19,8 +19,8 @@ export class ElementRelations extends RelationsStore<ElementId, ElementId, Eleme
 
     this.initialize();
 
-    this.subscribeObjectChange((obj, origin, change) => {
-      undoTrackerObserver.onChange(obj, origin, change);
+    this.subscribeObjectChange((obj, change, origin) => {
+      undoTrackerObserver.onChange(obj, change, origin);
     });
   }
 

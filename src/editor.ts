@@ -19,12 +19,12 @@ export class Editor {
     this.changeManager = new ChangeManager(room);
 
     this.relations = new ElementRelations(room, liveblocksRoot, this.changeManager,
-      { onChange: (obj, origin, change) => this.undoTracker.onChange(this.relations, obj, origin, change) },
+      { onChange: (obj, change, origin) => this.undoTracker.onChange(this.relations, obj, change, origin) },
     );
 
     this.project = new ProjectStore(room, liveblocksRoot, this.changeManager,
       [this.relations.observerA, this.relations.observerB],
-      { onChange: (obj, origin, change) => this.undoTracker.onChange(this.project, obj, origin, change) },
+      { onChange: (obj, change, origin) => this.undoTracker.onChange(this.project, obj, change, origin) },
     );
   }
 

@@ -1,7 +1,7 @@
 import { LiveObject, Room } from "@liveblocks/client";
 import { ElementId, FileFormat } from "./fileFormat";
 import { Sketch } from "./elements/sketch";
-import { ArcolObjectStore, ChangeOrigin, ObjectChange, ObjectListener, ObjectObserver, StoreName } from "./arcolObjectStore";
+import { ArcolObjectStore, ObjectChange, ObjectListener, ObjectObserver, StoreName } from "./arcolObjectStore";
 import { Extrusion } from "./elements/extrusion";
 import { Group } from "./elements/group";
 import { Level } from "./elements/level";
@@ -18,7 +18,7 @@ class DeleteEmptyExtrusionObserver implements ElementObserver {
 
   constructor(private store: ProjectStore) {}
 
-  public onChange(obj: Element, _origin: ChangeOrigin, change: ObjectChange) {
+  public onChange(obj: Element, change: ObjectChange) {
     if (obj.type === "sketch") {
       if (obj.parent?.type === "extrusion" && change.type === "delete") {
         this.elementsToCheck.add(obj.parent.id);
@@ -77,9 +77,9 @@ export class ProjectStore extends ArcolObjectStore<ElementId, Element> {
       new DeleteEmptyExtrusionObserver(this),
     ];
 
-    this.subscribeObjectChange((obj, origin, change) => {
+    this.subscribeObjectChange((obj, change, origin) => {
       for (const observer of this.observers) {
-        observer.onChange(obj, origin, change);
+        observer.onChange(obj, change, origin);
       }
     });
   }

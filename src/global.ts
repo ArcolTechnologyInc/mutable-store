@@ -1,7 +1,5 @@
 import { Room } from "@liveblocks/client";
-import { ProjectStore } from "./project";
 import { Element } from "./elements/element";
-import { UndoHistory } from "./undoRedo";
 import { create } from "zustand";
 import { ElementId } from "./fileFormat";
 import { useCallback, useEffect, useState } from "react";
@@ -76,7 +74,7 @@ export function useSelectionProperty<T>(propertyName: string): [SelectionPropert
   // part of one.
   useEffect(() => {
     updateValue(getSelectedElements(selection));
-    return editor.project.subscribeObjectChange((obj, _origin, change) => {
+    return editor.project.subscribeObjectChange((obj, change) => {
       if (!Object.keys(selection).some((id) => obj.id === id)) {
         return;
       }
@@ -115,7 +113,7 @@ export function useRelationsFrom(elementId: ElementId): [{ [id: ElementId]: true
 
   useEffect(() => {
     updateRelations();
-    return editor.relations.subscribeObjectChange((obj, _origin, change) => {
+    return editor.relations.subscribeObjectChange((obj, change) => {
       if (obj.keyA === elementId || obj.keyB === elementId) {
         updateRelations();
       }
